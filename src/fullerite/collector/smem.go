@@ -1,8 +1,8 @@
 // Requirements: smem (https://www.selenic.com/smem/).
-// Permissions: The user running fullerite should be able to access /proc/<pid>/smaps files for the process being monitored
 //
 // Config file: SmemStats.conf
 // Example: {
+//   "user": "some-user", <-- This user should be able to access the /proc/<pid>/smaps files listed in the whitelist below
 //   "procsWhitelist": "apache2|tmux"
 // }
 
