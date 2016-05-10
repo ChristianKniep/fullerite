@@ -33,8 +33,7 @@ export PATH
 GO15VENDOREXPERIMENT := 0
 export GO15VENDOREXPERIMENT
 
-# all: clean fmt lint $(FULLERITE) $(BEATIT) test
-all: $(FULLERITE) $(BEATIT)
+all: clean fmt lint $(FULLERITE) $(BEATIT) test
 
 .PHONY: clean
 clean:
@@ -71,9 +70,6 @@ qbt:
 	@for pkg in $(PKGS); do \
 		gom test -v -cover $$pkg || exit 1;\
 	done
-
-mine:
-	gom test -v fullerite/collector -run Smem
 
 diamond_core_test:
 	@python src/diamond/test.py -d

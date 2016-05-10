@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var smemOutput = `   516  2477764 -bash
-  2976  2478188 login
-  2132  2494148 -bash
-   864  2442180 apache2
-  3020  2496120 login
-  1504  2457284 -bash
-   516  2465476 -bash
+var smemOutput = `   5   516  2477764 -bash
+  4   2976  2478188 login
+  4   2132  2494148 -bash
+  5   864  2442180 apache2
+  10  3020  2496120 login
+  4   1504  2457284 -bash
+  6    516  2465476 -bash
 `
 
 func TestNewSmemStats(t *testing.T) {
@@ -87,7 +87,7 @@ func TestSmemStatsCollect(t *testing.T) {
 
 	actual := []metric.Metric{}
 	expected := []metric.Metric{
-		metric.Metric{Name: "apache2.smem.pss", MetricType: "gauge", Value: 0, Dimensions: map[string]string{}},
+		metric.Metric{Name: "apache2.smem.pss", MetricType: "gauge", Value: 5, Dimensions: map[string]string{}},
 		metric.Metric{Name: "apache2.smem.vss", MetricType: "gauge", Value: 2.44218e+06, Dimensions: map[string]string{}},
 		metric.Metric{Name: "apache2.smem.rss", MetricType: "gauge", Value: 864, Dimensions: map[string]string{}},
 	}
