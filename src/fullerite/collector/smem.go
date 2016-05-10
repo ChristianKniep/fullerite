@@ -78,7 +78,7 @@ func (s *SmemStats) getSmemStats() []smemStatLine {
 	var out []byte
 	var err error
 
-	cmd := execCommand("/bin/ps", "ax", "-o", "rss=,vsz=,comm=")
+	cmd := execCommand("/usr/bin/smem", "-c", "pss rss vss name")
 	if out, err = commandOutput(cmd); err != nil {
 		s.log.Error(err.Error())
 		return nil
@@ -94,12 +94,12 @@ func (s *SmemStats) parseSmemLines(out string) []smemStatLine {
 
 	for _, line := range lines {
 		parts := strings.Fields(line)
-		if s.whitelistedProcs.Match([]byte(parts[2])) {
+		if s.whitelistedProcs.Match([]byte(parts[3])) {
 			stats = append(stats, smemStatLine{
-				proc: parts[2],
-				pss:  0,
-				rss:  strToFloat(parts[0]),
-				vss:  strToFloat(parts[1]),
+				proc: parts[3],
+				pss:  strToFloat(parts[0]),
+				rss:  strToFloat(parts[1]),
+				vss:  strToFloat(parts[2]),
 			})
 		}
 	}
