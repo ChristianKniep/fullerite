@@ -43,6 +43,8 @@ func TestDefaultConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, "/etc/nerve/nerve.conf.json", collector.configFilePath)
 	assert.Equal(t, "server-status?auto", collector.queryPath)
 	assert.Equal(t, time.Duration(1)*time.Hour, collector.statusTTL)
+	assert.Equal(t, "localhost", collector.host)
+	assert.Equal(t, "NerveHTTPD", collector.Name())
 }
 
 func TestCustomConfigNerveHTTPD(t *testing.T) {
@@ -50,6 +52,7 @@ func TestCustomConfigNerveHTTPD(t *testing.T) {
 	configMap := map[string]interface{}{
 		"status_ttl":     120,
 		"configFilePath": "/tmp/foobar",
+		"host":           "169.0.0.1",
 	}
 	collector.Configure(configMap)
 
@@ -57,6 +60,7 @@ func TestCustomConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, "/tmp/foobar", collector.configFilePath)
 	assert.Equal(t, "server-status?auto", collector.queryPath)
 	assert.Equal(t, time.Duration(120)*time.Second, collector.statusTTL)
+	assert.Equal(t, "169.0.0.1", collector.host)
 }
 
 func TestExtractApacheMetrics(t *testing.T) {
@@ -82,6 +86,18 @@ func TestFetchApacheMetrics(t *testing.T) {
 	endpoint := ts.URL + "/server-status?auto=close"
 	httpResponse := fetchApacheMetrics(endpoint, 10)
 	assert.Equal(t, 404, httpResponse.status)
+}
+
+func TestErrorFetchingMetrics(t *testing.T) {
+	// this ensures that we are fetching metrics from a unavailable server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
+	endpoint := ts.URL + "/server-status?auto=close"
+	ts.Close()
+
+	httpResponse := fetchApacheMetrics(endpoint, 10)
+	assert.Equal(t, 0, httpResponse.status)
 }
 
 func TestNerveHTTPDCollect(t *testing.T) {
