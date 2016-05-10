@@ -9,9 +9,9 @@
 package collector
 
 import (
+	"fullerite/config"
 	"fullerite/metric"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -28,10 +28,13 @@ type smemStatLine struct {
 // SmemStats Collector to record smem stats
 type SmemStats struct {
 	baseCollector
-	whitelistedProcs *regexp.Regexp
+	user             string
+	whitelistedProcs string
 }
 
 var (
+	requiredConfigs = []string{"user", "procsWhitelist"}
+
 	execCommand   = exec.Command
 	commandOutput = (*exec.Cmd).Output
 	getSmemStats  = (*SmemStats).getSmemStats
@@ -54,20 +57,24 @@ func newSmemStats(channel chan metric.Metric, initialInterval int, log *l.Entry)
 // Configure Override *baseCollector.Configure(); will fetch the whitelisted processes
 func (s *SmemStats) Configure(configMap map[string]interface{}) {
 	s.configureCommonParams(configMap)
+	cfg := config.GetAsMap(configMap)
 
-	if pattern, exists := configMap["procsWhitelist"]; exists {
-		if re, err := regexp.Compile(pattern.(string)); err == nil {
-			s.whitelistedProcs = re
-		} else {
-			s.log.Warn("Failed to compile the procsWhitelist regex:", err)
-		}
+	if user, exists := cfg["user"]; exists {
+		s.user = user
+	} else {
+		s.log.Warn("Required config does not exist for SmemStats: user")
+	}
 
+	if whitelist, exists := cfg["procsWhitelist"]; exists {
+		s.whitelistedProcs = whitelist
+	} else {
+		s.log.Warn("Required config does not exist for SmemStats: procsWhitelist")
 	}
 }
 
 // Collect periodically call smem periodically
 func (s *SmemStats) Collect() {
-	if s.whitelistedProcs == nil {
+	if s.whitelistedProcs == "" || s.user == "" {
 		return
 	}
 
@@ -82,7 +89,12 @@ func (s *SmemStats) getSmemStats() []smemStatLine {
 	var out []byte
 	var err error
 
-	cmd := execCommand("/usr/bin/smem", "-c", "pss rss vss name")
+	cmd := execCommand(
+		"/usr/bin/sudo",
+		"-u", s.user,
+		"/usr/bin/smem",
+		"-p", s.whitelistedProcs,
+		"-c", "pss rss vss name")
 	if out, err = commandOutput(cmd); err != nil {
 		s.log.Error(err.Error())
 		return nil
@@ -98,14 +110,12 @@ func (s *SmemStats) parseSmemLines(out string) []smemStatLine {
 
 	for _, line := range lines {
 		parts := strings.Fields(line)
-		if s.whitelistedProcs.Match([]byte(parts[3])) {
-			stats = append(stats, smemStatLine{
-				proc: parts[3],
-				pss:  strToFloat(parts[0]),
-				rss:  strToFloat(parts[1]),
-				vss:  strToFloat(parts[2]),
-			})
-		}
+		stats = append(stats, smemStatLine{
+			proc: parts[3],
+			pss:  strToFloat(parts[0]),
+			rss:  strToFloat(parts[1]),
+			vss:  strToFloat(parts[2]),
+		})
 	}
 
 	return stats

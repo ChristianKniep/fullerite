@@ -3,20 +3,13 @@ package collector
 import (
 	"fullerite/metric"
 	"os/exec"
-	"regexp"
 	"testing"
 
 	l "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
-var smemOutput = `   5   516  2477764 -bash
-  4   2976  2478188 login
-  4   2132  2494148 -bash
-  5   864  2442180 apache2
-  10  3020  2496120 login
-  4   1504  2457284 -bash
-  6    516  2465476 -bash
+var smemOutput = `   5   864  2442180 apache2
 `
 
 func TestNewSmemStats(t *testing.T) {
@@ -35,27 +28,24 @@ func TestNewSmemStats(t *testing.T) {
 func TestSmemStatsConfigure(t *testing.T) {
 	tests := []struct {
 		config            map[string]interface{}
-		expectedWhitelist *regexp.Regexp
+		expectedWhitelist string
+		expectedUser      string
 		msg               string
 	}{
 		{
 			config: map[string]interface{}{
+				"user":           "fullerite",
 				"procsWhitelist": "apache2|tmux",
 			},
-			expectedWhitelist: regexp.MustCompile("apache2|tmux"),
-			msg:               "procsWhitelist is valid, so no errors",
+			expectedWhitelist: "apache2|tmux",
+			expectedUser:      "fullerite",
+			msg:               "All configs are valid, so no errors",
 		},
 		{
 			config:            map[string]interface{}{},
-			expectedWhitelist: nil,
-			msg:               "procsWhitelist is not provided, so we should expect a warning",
-		},
-		{
-			config: map[string]interface{}{
-				"procsWhitelist": "[0-9]++",
-			},
-			expectedWhitelist: nil,
-			msg:               "procsWhitelist is not provided, so we should expect a warning",
+			expectedWhitelist: "",
+			expectedUser:      "",
+			msg:               "Required configs missing",
 		},
 	}
 
@@ -94,7 +84,8 @@ func TestSmemStatsCollect(t *testing.T) {
 
 	c := make(chan metric.Metric)
 	sut := newSmemStats(c, 0, defaultLog).(*SmemStats)
-	sut.whitelistedProcs = regexp.MustCompile("apache2")
+	sut.user = "user"
+	sut.whitelistedProcs = "some|whitelist"
 	go sut.Collect()
 
 	for i := 0; i < len(expected); i++ {
@@ -115,7 +106,6 @@ func TestSmemStatsInvalidRegex(t *testing.T) {
 	}
 
 	sut := newSmemStats(nil, 0, nil).(*SmemStats)
-	sut.whitelistedProcs = nil
 	sut.Collect()
 
 	assert.False(t, getSmemStatsCalled)
