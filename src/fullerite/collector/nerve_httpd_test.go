@@ -44,6 +44,7 @@ func TestDefaultConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, "server-status?auto", collector.queryPath)
 	assert.Equal(t, time.Duration(1)*time.Hour, collector.statusTTL)
 	assert.Equal(t, "localhost", collector.host)
+	assert.Equal(t, "NerveHTTPD", collector.Name())
 }
 
 func TestCustomConfigNerveHTTPD(t *testing.T) {
