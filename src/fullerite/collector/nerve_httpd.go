@@ -74,7 +74,7 @@ func newNerveHTTPD(channel chan metric.Metric, initialInterval int, log *l.Entry
 	c.log = log
 	c.mu = new(sync.RWMutex)
 
-	c.name = collectorName
+	c.name = "NerveHTTPD"
 	c.configFilePath = "/etc/nerve/nerve.conf.json"
 	c.queryPath = "server-status?auto"
 	c.host = "localhost"
