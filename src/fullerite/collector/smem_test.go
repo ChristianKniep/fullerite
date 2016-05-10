@@ -103,3 +103,20 @@ func TestSmemStatsCollect(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+func TestSmemStatsInvalidRegex(t *testing.T) {
+	oldGetSmemStats := getSmemStats
+	defer func() { getSmemStats = oldGetSmemStats }()
+
+	getSmemStatsCalled := false
+	getSmemStats = func(*SmemStats) []smemStatLine {
+		getSmemStatsCalled = true
+		return nil
+	}
+
+	sut := newSmemStats(nil, 0, nil).(*SmemStats)
+	sut.whitelistedProcs = nil
+	sut.Collect()
+
+	assert.False(t, getSmemStatsCalled)
+}

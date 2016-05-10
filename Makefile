@@ -146,3 +146,6 @@ else ifeq ($(OS),CentOS)
 else
 	@echo "OS not supported"
 endif
+
+mine:
+	gom test -v fullerite/collector -run Smem

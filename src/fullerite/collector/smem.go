@@ -18,11 +18,6 @@ import (
 	l "github.com/Sirupsen/logrus"
 )
 
-var (
-	execCommand   = exec.Command
-	commandOutput = (*exec.Cmd).Output
-)
-
 type smemStatLine struct {
 	proc string
 	pss  float64
@@ -35,6 +30,12 @@ type SmemStats struct {
 	baseCollector
 	whitelistedProcs *regexp.Regexp
 }
+
+var (
+	execCommand   = exec.Command
+	commandOutput = (*exec.Cmd).Output
+	getSmemStats  = (*SmemStats).getSmemStats
+)
 
 func init() {
 	RegisterCollector("SmemStats", newSmemStats)
@@ -66,12 +67,15 @@ func (s *SmemStats) Configure(configMap map[string]interface{}) {
 
 // Collect periodically call smem periodically
 func (s *SmemStats) Collect() {
-	for _, stat := range s.getSmemStats() {
-		s.publishMetric(stat.proc, "pss", stat.pss)
-		s.publishMetric(stat.proc, "vss", stat.vss)
-		s.publishMetric(stat.proc, "rss", stat.rss)
+	if s.whitelistedProcs == nil {
+		return
 	}
 
+	for _, stat := range getSmemStats(s) {
+		s.Channel() <- metric.WithValue(stat.proc+".smem.pss", stat.pss)
+		s.Channel() <- metric.WithValue(stat.proc+".smem.vss", stat.vss)
+		s.Channel() <- metric.WithValue(stat.proc+".smem.rss", stat.rss)
+	}
 }
 
 func (s *SmemStats) getSmemStats() []smemStatLine {
@@ -105,13 +109,6 @@ func (s *SmemStats) parseSmemLines(out string) []smemStatLine {
 	}
 
 	return stats
-}
-
-func (s *SmemStats) publishMetric(proc string, metricType string, val float64) {
-	m := metric.New(proc + ".smem." + metricType)
-	m.Value = val
-
-	s.Channel() <- m
 }
 
 func strToFloat(val string) float64 {
