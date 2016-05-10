@@ -93,7 +93,7 @@ func (s *SmemStats) getSmemStats() []smemStatLine {
 		"/usr/bin/sudo",
 		"-u", s.user,
 		"/usr/bin/smem",
-		"-p", s.whitelistedProcs,
+		"-P", s.whitelistedProcs,
 		"-c", "pss rss vss name")
 	if out, err = commandOutput(cmd); err != nil {
 		s.log.Error(err.Error())
