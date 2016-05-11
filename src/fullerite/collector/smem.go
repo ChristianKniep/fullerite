@@ -3,7 +3,8 @@
 // Config file: SmemStats.conf
 // Example: {
 //   "user": "some-user", <-- This user should be able to access the /proc/<pid>/smaps files listed in the whitelist below
-//   "procsWhitelist": "apache2|tmux"
+//   "procsWhitelist": "apache2|tmux",
+//   "smemPath": "/usr/bin/smem" <-- Path to the smem executable
 // }
 
 package collector
@@ -30,6 +31,7 @@ type SmemStats struct {
 	baseCollector
 	user             string
 	whitelistedProcs string
+	smemPath         string
 }
 
 var (
@@ -70,11 +72,17 @@ func (s *SmemStats) Configure(configMap map[string]interface{}) {
 	} else {
 		s.log.Warn("Required config does not exist for SmemStats: procsWhitelist")
 	}
+
+	if smemPath, exists := cfg["smemPath"]; exists {
+		s.smemPath = smemPath
+	} else {
+		s.log.Warn("Required config does not exist for SmemStats: smemPath")
+	}
 }
 
 // Collect periodically call smem periodically
 func (s *SmemStats) Collect() {
-	if s.whitelistedProcs == "" || s.user == "" {
+	if s.whitelistedProcs == "" || s.user == "" || s.smemPath == "" {
 		return
 	}
 
@@ -92,7 +100,7 @@ func (s *SmemStats) getSmemStats() []smemStatLine {
 	cmd := execCommand(
 		"/usr/bin/sudo",
 		"-u", s.user,
-		"/usr/bin/smem",
+		s.smemPath,
 		"-P", s.whitelistedProcs,
 		"-c", "pss rss vss name")
 	if out, err = commandOutput(cmd); err != nil {

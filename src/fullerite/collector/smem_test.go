@@ -30,21 +30,25 @@ func TestSmemStatsConfigure(t *testing.T) {
 		config            map[string]interface{}
 		expectedWhitelist string
 		expectedUser      string
+		expectedSmemPath  string
 		msg               string
 	}{
 		{
 			config: map[string]interface{}{
 				"user":           "fullerite",
 				"procsWhitelist": "apache2|tmux",
+				"smemPath":       "/path/to/smem",
 			},
 			expectedWhitelist: "apache2|tmux",
 			expectedUser:      "fullerite",
+			expectedSmemPath:  "/path/to/smem",
 			msg:               "All configs are valid, so no errors",
 		},
 		{
 			config:            map[string]interface{}{},
 			expectedWhitelist: "",
 			expectedUser:      "",
+			expectedSmemPath:  "",
 			msg:               "Required configs missing",
 		},
 	}
@@ -54,7 +58,10 @@ func TestSmemStatsConfigure(t *testing.T) {
 	for _, test := range tests {
 		sut := newSmemStats(nil, 0, l).(*SmemStats)
 		sut.Configure(test.config)
+
+		assert.Equal(t, test.expectedUser, sut.user, test.msg)
 		assert.Equal(t, test.expectedWhitelist, sut.whitelistedProcs, test.msg)
+		assert.Equal(t, test.expectedSmemPath, sut.smemPath, test.msg)
 	}
 }
 
@@ -86,6 +93,7 @@ func TestSmemStatsCollect(t *testing.T) {
 	sut := newSmemStats(c, 0, defaultLog).(*SmemStats)
 	sut.user = "user"
 	sut.whitelistedProcs = "some|whitelist"
+	sut.smemPath = "/path/to/smem"
 	go sut.Collect()
 
 	for i := 0; i < len(expected); i++ {
@@ -95,7 +103,7 @@ func TestSmemStatsCollect(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
-func TestSmemStatsInvalidRegex(t *testing.T) {
+func TestSmemStatsCollectNotCalled(t *testing.T) {
 	oldGetSmemStats := getSmemStats
 	defer func() { getSmemStats = oldGetSmemStats }()
 
@@ -105,8 +113,30 @@ func TestSmemStatsInvalidRegex(t *testing.T) {
 		return nil
 	}
 
-	sut := newSmemStats(nil, 0, nil).(*SmemStats)
-	sut.Collect()
+	tests := []struct {
+		user             string
+		whitelistedProcs string
+		smemPath         string
+	}{
+		{
+			user: "user",
+		},
+		{
+			whitelistedProcs: "apache2",
+		},
+		{
+			smemPath: "/path/to/smem",
+		},
+	}
 
-	assert.False(t, getSmemStatsCalled)
+	for _, test := range tests {
+		sut := newSmemStats(nil, 0, nil).(*SmemStats)
+		sut.user = test.user
+		sut.whitelistedProcs = test.whitelistedProcs
+		sut.smemPath = test.smemPath
+
+		sut.Collect()
+
+		assert.False(t, getSmemStatsCalled)
+	}
 }
