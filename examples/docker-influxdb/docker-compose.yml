@@ -1,0 +1,58 @@
+consul:
+    image: qnib/alpn-consul
+    hostname: consul
+    container_name: consul
+    ports:
+     - 8500
+    environment:
+     - DC_NAME=dc1
+     - CONSUL_BOOTSTRAP_EXPECT=1
+    dns: 127.0.0.1
+
+influxdb:
+    hostname: influxdb
+    container_name: influxdb
+    image: qnib/influxdb
+    dns: 127.0.0.1
+    environment:
+     - DC_NAME=dc1
+     - INFLUXDB_GRAPHITE_ENABLED=true
+    volumes:
+     - /opt/influxdb/shared
+    links:
+     - consul:consul
+    ports:
+     - 4242:4242
+     - 8083:8083
+     - 8086:8086
+
+grafana3:
+    hostname: grafana3
+    container_name: grafana3
+    image: qnib/grafana3
+    dns: 127.0.0.1
+    environment:
+     - DC_NAME=dc1
+     - GRAFANA_DEFAULT_SOURCE=influxdb
+     - SENSU_SERVER=false
+     - SENSU_CLIENT=false
+     - SENSU_API=false
+    ports:
+     - "3000:3000"
+    links:
+     - consul:consul
+
+fullerite:
+    image: qnib/fullerite
+    container_name: fullerite
+    hostname: fullerite
+    dns: 127.0.0.1
+    environment:
+     - FULLERITE_INFLUXDB_ENABLED=true
+     - FULLERITE_INFLUXDB_PORT=8086
+    links:
+     - consul:consul
+    volumes:
+    # Uncomment this and point it to your fullerite folder to use the LinuxMusl binary
+    # - ~/src/github.com/ChristianKniep/fullerite/bin/:/opt/fullerite/bin/
+     - /var/run/docker.sock:/var/run/docker.sock:ro
