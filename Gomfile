@@ -10,3 +10,4 @@ gom 'github.com/golang/lint/golint', :commit => '8f348af5e29faa4262efdc14302797f
 gom 'github.com/golang/protobuf/proto', :commit => '68415e7123da32b07eab49c96d2c4d6158360e9b'
 gom "github.com/stretchr/testify/assert"
 gom "github.com/samuel/go-thrift", :commit => 'ca819cf963ab710e7a285044e92f1353fa497b80'
+gom "github.com/influxdata/influxdb/client/v2/"
