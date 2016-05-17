@@ -41,6 +41,7 @@ var (
 	execCommand   = exec.Command
 	commandOutput = (*exec.Cmd).Output
 	getSmemStats  = (*SmemStats).getSmemStats
+	allMetrics    = []string{"rss", "vss", "pss"}
 )
 
 func init() {
@@ -79,10 +80,10 @@ func (s *SmemStats) Configure(configMap map[string]interface{}) {
 		s.log.Warn("Required config does not exist for SmemStats: smemPath")
 	}
 
-	if whitelist, exists := configMap["metricsWhitelist"]; exists {
-		s.whitelistedMetrics = config.GetAsSlice(whitelist)
+	if blacklist, exists := configMap["metricsBlacklist"]; exists {
+		s.whitelistedMetrics = getWhitelistedMetrics(config.GetAsSlice(blacklist))
 	} else {
-		s.log.Warn("Required config does not exist for SmemStats: metricsWhitelist")
+		s.whitelistedMetrics = allMetrics
 	}
 }
 
@@ -148,4 +149,21 @@ func strToFloat(val string) float64 {
 	}
 
 	return 0
+}
+
+func getWhitelistedMetrics(blacklist []string) []string {
+	var diff []string
+	for _, s1 := range allMetrics {
+		found := false
+		for _, s2 := range blacklist {
+			if s1 == s2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			diff = append(diff, s1)
+		}
+	}
+	return diff
 }
