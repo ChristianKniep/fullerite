@@ -29,9 +29,10 @@ type smemStatLine struct {
 // SmemStats Collector to record smem stats
 type SmemStats struct {
 	baseCollector
-	user             string
-	whitelistedProcs string
-	smemPath         string
+	user               string
+	whitelistedProcs   string
+	smemPath           string
+	whitelistedMetrics []string
 }
 
 var (
@@ -59,24 +60,29 @@ func newSmemStats(channel chan metric.Metric, initialInterval int, log *l.Entry)
 // Configure Override *baseCollector.Configure(); will fetch the whitelisted processes
 func (s *SmemStats) Configure(configMap map[string]interface{}) {
 	s.configureCommonParams(configMap)
-	cfg := config.GetAsMap(configMap)
 
-	if user, exists := cfg["user"]; exists {
-		s.user = user
+	if user, exists := configMap["user"]; exists {
+		s.user = user.(string)
 	} else {
 		s.log.Warn("Required config does not exist for SmemStats: user")
 	}
 
-	if whitelist, exists := cfg["procsWhitelist"]; exists {
-		s.whitelistedProcs = whitelist
+	if whitelist, exists := configMap["procsWhitelist"]; exists {
+		s.whitelistedProcs = whitelist.(string)
 	} else {
 		s.log.Warn("Required config does not exist for SmemStats: procsWhitelist")
 	}
 
-	if smemPath, exists := cfg["smemPath"]; exists {
-		s.smemPath = smemPath
+	if smemPath, exists := configMap["smemPath"]; exists {
+		s.smemPath = smemPath.(string)
 	} else {
 		s.log.Warn("Required config does not exist for SmemStats: smemPath")
+	}
+
+	if whitelist, exists := configMap["metricsWhitelist"]; exists {
+		s.whitelistedMetrics = config.GetAsSlice(whitelist)
+	} else {
+		s.log.Warn("Required config does not exist for SmemStats: metricsWhitelist")
 	}
 }
 
@@ -87,9 +93,16 @@ func (s *SmemStats) Collect() {
 	}
 
 	for _, stat := range getSmemStats(s) {
-		s.Channel() <- metric.WithValue(stat.proc+".smem.pss", stat.pss)
-		s.Channel() <- metric.WithValue(stat.proc+".smem.vss", stat.vss)
-		s.Channel() <- metric.WithValue(stat.proc+".smem.rss", stat.rss)
+		for _, element := range s.whitelistedMetrics {
+			switch element {
+			case "pss":
+				s.Channel() <- metric.WithValue(stat.proc+".smem.pss", stat.pss)
+			case "vss":
+				s.Channel() <- metric.WithValue(stat.proc+".smem.vss", stat.vss)
+			case "rss":
+				s.Channel() <- metric.WithValue(stat.proc+".smem.rss", stat.rss)
+			}
+		}
 	}
 }
 
