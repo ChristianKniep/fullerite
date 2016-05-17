@@ -39,7 +39,7 @@ func TestSmemStatsConfigure(t *testing.T) {
 				"user":             "fullerite",
 				"procsWhitelist":   "apache2|tmux",
 				"smemPath":         "/path/to/smem",
-				"metricsWhitelist": []string{"pss"},
+				"metricsBlacklist": []string{"rss", "vss"},
 			},
 			expectedWhitelist:   "apache2|tmux",
 			expectedUser:        "fullerite",
@@ -52,7 +52,7 @@ func TestSmemStatsConfigure(t *testing.T) {
 			expectedWhitelist:   "",
 			expectedUser:        "",
 			expectedSmemPath:    "",
-			expectedMetricslist: nil,
+			expectedMetricslist: []string{"rss", "vss", "pss"},
 			msg:                 "Required configs missing",
 		},
 	}
