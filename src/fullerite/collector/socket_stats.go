@@ -1,30 +1,26 @@
 package collector
 
 import (
-	"encoding/json"
+	"fullerite/config"
 	"fullerite/metric"
-	"io/ioutil"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	l "github.com/Sirupsen/logrus"
-)
-
-const (
-	cName = "SocketStats"
-	mName = "socket_stats."
 )
 
 // SocketStats reports output of "ss" command and reports
 // the socket RecvQ value as a metric.
 type SocketStats struct {
 	baseCollector
-	configFilePath string
+	portList []string
 }
 
-type configData struct {
-	PortList []string
-}
+var (
+	executeCommand = exec.Command
+	cmdOutput      = (*exec.Cmd).CombinedOutput
+)
 
 func init() {
 	RegisterCollector("SocketStats", newSocketStats)
@@ -35,52 +31,40 @@ func newSocketStats(channel chan metric.Metric, initialInterval int, log *l.Entr
 	ss.channel = channel
 	ss.interval = initialInterval
 	ss.log = log
+	ss.name = "SocketStats"
 
-	ss.name = cName
-	ss.configFilePath = "/etc/socket_stats/socket_stats.conf.json"
 	return ss
 }
 
 // Configure Override default parameters
 func (ss *SocketStats) Configure(configMap map[string]interface{}) {
-	if val, exists := configMap["configFilePath"]; exists {
-		ss.configFilePath = val.(string)
+	if asInterface, exists := configMap["PortList"]; exists {
+		ss.portList = config.GetAsSlice(asInterface)
 	}
-	ss.configureCommonParams(configMap)
 }
 
 // Collect the receive queue size (RecvQ)
 func (ss SocketStats) Collect() {
 
-	configFileContent, err := ioutil.ReadFile(ss.configFilePath)
-	if err != nil {
-		ss.log.Warn("Failed to read config file ", ss.configFilePath, " error = ", err)
-		return
-	}
-
-	data := new(configData)
-	err = json.Unmarshal(configFileContent, data)
-	if err != nil {
-		ss.log.Warn("Failed to parse the configuration at ", ss.configFilePath, ": ", err)
-		return
-	}
-	for i := 0; i < len(data.PortList); i++ {
-		sport := data.PortList[i]
+	for i := 0; i < len(ss.portList); i++ {
+		sport := ss.portList[i]
 		value, err := getSocketStats(sport)
 		if err != nil {
 			ss.log.Error("Error while collecting metrics: ", err, " for port ", sport)
 			return
 		}
-		metric := metric.New(mName + sport)
+		metric := metric.New("ss." + sport)
 		metric.Value = value
 		ss.log.Debug(metric)
+		// ss.Channel() <- metric
 	}
 }
 
 func getSocketStats(sport string) (float64, error) {
 	// Run the command 'ss -ntl sport = : <port_num>' to obtain the recvQ value
 	args := "-ntl sport = :" + sport
-	output, err := exec.Command("ss", args).CombinedOutput()
+	cmd := execCommand("ss", args)
+	output, err := cmdOutput(cmd)
 	if err != nil {
 		return 0.0, err
 	}
@@ -90,11 +74,18 @@ func getSocketStats(sport string) (float64, error) {
 }
 
 func getValueFromOutput(output []byte) float64 {
-	lines := strings.SplitN(string(output), "\n", 2)
+	lines := strings.Split(string(output), "\n")
 	if len(lines) < 2 {
 		return 0.0
 	}
-	// strVal := strings.Fields(lines[1])[1]
-	// return strconv.ParseFloat(strVal, 64)
-	return 0.0
+	parts := strings.Fields(lines[1]) // Second line of the output
+	return strToFlt(parts[1]) // RecvQ - second column
+}
+
+func strToFlt(val string) float64 {
+	if i, err := strconv.ParseFloat(val, 64); err == nil {
+		return i
+	}
+
+	return 0
 }

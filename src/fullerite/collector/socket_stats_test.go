@@ -2,9 +2,7 @@ package collector
 
 import (
 	"fullerite/metric"
-	"io/ioutil"
-	"encoding/json"
-	"os"
+	"os/exec"
 	"testing"
 
 	l "github.com/Sirupsen/logrus"
@@ -15,50 +13,54 @@ func getSocketStatsCollector() *SocketStats {
 	return newSocketStats(make(chan metric.Metric), 10, l.WithField("testing", "socket_stats")).(*SocketStats)
 }
 
-func getRawSocketStats(name string) []byte {
-	metric := []byte(`
-socket_stats.9080: 50
-socket_stats.1234: 174
-	`)
-	return metric
-}
-
-func setupTestConfig(name string) {
-	testConfig := make(map[string]interface{}, 2)
-	testConfig["PortList"] = []interface{} {9080, 1234}
-
-	testFile, _ := ioutil.TempFile("", name)
-	defer os.Remove(testFile.Name())
-
-	marshalled, _ := json.Marshal(testConfig)
-	testFile.Write(marshalled)
-}
+var socketStatsOut = `6 100 20 10
+174 50 20 10
+`
 
 func TestDefaultConfigSocketStats(t *testing.T) {
 	sscol := getSocketStatsCollector()
 	sscol.Configure(make(map[string]interface{}))
 
 	assert.Equal(t, 10, sscol.Interval())
-	assert.Equal(t, "/etc/socket_stats/socket_stats.conf.json", sscol.configFilePath)
 }
-
 
 func TestCustomConfigSocketStats(t *testing.T) {
 	sscol := getSocketStatsCollector()
 	configMap := map[string]interface{}{
-		"configFilePath": "/tmp/test.json",
+		"PortList": []string{"9080"},
 	}
 	sscol.Configure(configMap)
 	assert.Equal(t, 10, sscol.Interval())
-	assert.Equal(t, "/tmp/test.json", sscol.configFilePath)
+	assert.Equal(t, []string{"9080"}, sscol.portList)
 }
 
 func TestCollectSocketStats(t *testing.T) {
-	setupTestConfig("socket_stats_testing")
-	sscol := getSocketStatsCollector()
+	oldExecCommand := executeCommand
+	oldCommandOutput := cmdOutput
+
+	defer func() {
+		executeCommand = oldExecCommand
+		cmdOutput = oldCommandOutput
+	}()
+
+	executeCommand = func(string, ...string) *exec.Cmd {
+		return &exec.Cmd{}
+	}
+
+	cmdOutput = func(*exec.Cmd) ([]byte, error) {
+		return []byte(socketStatsOut), nil
+	}
+
+	expected := metric.Metric{Name: "ss.9080", MetricType: "gauge", Value: 50, Dimensions:map[string]string{}}
+
+	c := make(chan metric.Metric)
+	sscol := newSocketStats(c, 0, l.WithField("testing", "socket_stats")).(*SocketStats)
 	cfg := map[string]interface{}{
-		"configFilePath": "socket_stats_testing",
+		"PortList": []string{"9080"},
 	}
 	sscol.Configure(cfg)
-	sscol.Collect()
+	go sscol.Collect()
+
+	actual :=  <-sscol.Channel()
+	assert.Equal(t, expected, actual)
 }
