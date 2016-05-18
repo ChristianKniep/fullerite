@@ -41,6 +41,7 @@ func (ss *SocketStats) Configure(configMap map[string]interface{}) {
 	if asInterface, exists := configMap["PortList"]; exists {
 		ss.portList = config.GetAsSlice(asInterface)
 	}
+	ss.configureCommonParams(configMap)
 }
 
 // Collect the receive queue size (RecvQ)
