@@ -56,7 +56,7 @@ func (ss SocketStats) Collect() {
 		metric := metric.New("ss." + sport)
 		metric.Value = value
 		ss.log.Debug(metric)
-		// ss.Channel() <- metric
+		ss.Channel() <- metric
 	}
 }
 
@@ -79,7 +79,7 @@ func getValueFromOutput(output []byte) float64 {
 		return 0.0
 	}
 	parts := strings.Fields(lines[1]) // Second line of the output
-	return strToFlt(parts[1]) // RecvQ - second column
+	return strToFlt(parts[1])         // RecvQ - second column
 }
 
 func strToFlt(val string) float64 {

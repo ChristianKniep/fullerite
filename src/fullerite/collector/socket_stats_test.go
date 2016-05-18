@@ -51,7 +51,7 @@ func TestCollectSocketStats(t *testing.T) {
 		return []byte(socketStatsOut), nil
 	}
 
-	expected := metric.Metric{Name: "ss.9080", MetricType: "gauge", Value: 50, Dimensions:map[string]string{}}
+	expected := metric.Metric{Name: "ss.9080", MetricType: "gauge", Value: 50, Dimensions: map[string]string{}}
 
 	c := make(chan metric.Metric)
 	sscol := newSocketStats(c, 0, l.WithField("testing", "socket_stats")).(*SocketStats)
@@ -61,6 +61,6 @@ func TestCollectSocketStats(t *testing.T) {
 	sscol.Configure(cfg)
 	go sscol.Collect()
 
-	actual :=  <-sscol.Channel()
+	actual := <-sscol.Channel()
 	assert.Equal(t, expected, actual)
 }
