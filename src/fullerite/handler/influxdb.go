@@ -7,7 +7,7 @@ import (
 	"time"
 
 	l "github.com/Sirupsen/logrus"
-	"github.com/influxdata/influxdb/client/v2"
+	influxClient "github.com/influxdata/influxdb/client/v2"
 )
 
 func init() {
@@ -88,13 +88,13 @@ func (i *InfluxDB) Run() {
 	i.run(i.emitMetrics)
 }
 
-func (i InfluxDB) createDatapoint(incomingMetric metric.Metric) (datapoint *client.Point) {
+func (i InfluxDB) createDatapoint(incomingMetric metric.Metric) (datapoint *influxClient.Point) {
 	tags := incomingMetric.GetDimensions(i.DefaultDimensions())
 	// Assemble field (could be improved to convey multiple fields)
 	fields := map[string]interface{}{
 		"value": incomingMetric.Value,
 	}
-	pt, err := client.NewPoint(incomingMetric.Name, tags, fields, time.Now())
+	pt, err := influxClient.NewPoint(incomingMetric.Name, tags, fields, time.Now())
 	if err != nil {
 		log.Fatalln("Error: ", err)
 	}
@@ -111,7 +111,7 @@ func (i *InfluxDB) emitMetrics(metrics []metric.Metric) bool {
 
 	// Make client
 	addr := fmt.Sprintf("http://%s:%s", i.server, i.port)
-	c, err := client.NewHTTPClient(client.HTTPConfig{
+	c, err := influxClient.NewHTTPClient(influxClient.HTTPConfig{
 		Addr:     addr,
 		Username: i.username,
 		Password: i.password,
@@ -122,7 +122,7 @@ func (i *InfluxDB) emitMetrics(metrics []metric.Metric) bool {
 		i.log.Debug("Connected to ", addr, ", using '", i.database, "' database")
 	}
 	// Create a new point batch to be send in bulk
-	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+	bp, err := influxClient.NewBatchPoints(influxClient.BatchPointsConfig{
 		Database:  i.database,
 		Precision: "s",
 	})
