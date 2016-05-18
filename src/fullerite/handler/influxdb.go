@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"fullerite/metric"
-	"log"
 	"time"
 
 	l "github.com/Sirupsen/logrus"
@@ -94,10 +93,7 @@ func (i InfluxDB) createDatapoint(incomingMetric metric.Metric) (datapoint *infl
 	fields := map[string]interface{}{
 		"value": incomingMetric.Value,
 	}
-	pt, err := influxClient.NewPoint(incomingMetric.Name, tags, fields, time.Now())
-	if err != nil {
-		log.Fatalln("Error: ", err)
-	}
+	pt, _ := influxClient.NewPoint(incomingMetric.Name, tags, fields, time.Now())
 	return pt
 }
 
@@ -116,19 +112,16 @@ func (i *InfluxDB) emitMetrics(metrics []metric.Metric) bool {
 		Username: i.username,
 		Password: i.password,
 	})
-	if err != nil {
-		log.Fatalln("Error: ", err)
+	if err == nil {
+		i.log.Warn("Not able to connect to DB: ", err)
 	} else {
 		i.log.Debug("Connected to ", addr, ", using '", i.database, "' database")
 	}
 	// Create a new point batch to be send in bulk
-	bp, err := influxClient.NewBatchPoints(influxClient.BatchPointsConfig{
+	bp, _ := influxClient.NewBatchPoints(influxClient.BatchPointsConfig{
 		Database:  i.database,
 		Precision: "s",
 	})
-	if err != nil {
-		log.Fatalln("Error: ", err)
-	}
 
 	//iterate over metrics
 	for _, m := range metrics {
