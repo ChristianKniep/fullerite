@@ -73,8 +73,8 @@ func (ss SocketQueue) emitSocketQueueMetrics(output []byte) {
 	lines := strings.Split(string(output), "\n")
 
 	pmap := make(map[string]float64)
-	for i := 1; i < len(lines); i++ {
-		res := re.FindAllStringSubmatch(lines[i], -1)
+	for _, line := range lines[1:] {
+		res := re.FindAllStringSubmatch(line, -1)
 		for _, v := range res {
 			sport, qsize := v[2], v[1]
 			pmap[sport] = util.StrToFloat(qsize)
