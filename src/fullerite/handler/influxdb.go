@@ -112,7 +112,7 @@ func (i *InfluxDB) emitMetrics(metrics []metric.Metric) bool {
 		Username: i.username,
 		Password: i.password,
 	})
-	if err == nil {
+	if err != nil {
 		i.log.Warn("Not able to connect to DB: ", err)
 	} else {
 		i.log.Debug("Connected to ", addr, ", using '", i.database, "' database")
