@@ -19,7 +19,7 @@ type SocketQueue struct {
 }
 
 var (
-	cmdOutput      = (*exec.Cmd).CombinedOutput
+	cmdOutput = (*exec.Cmd).CombinedOutput
 )
 
 func init() {
@@ -38,14 +38,21 @@ func newSocketQueue(channel chan metric.Metric, initialInterval int, log *l.Entr
 
 // Configure Override default parameters
 func (ss *SocketQueue) Configure(configMap map[string]interface{}) {
+	ss.configureCommonParams(configMap)
 	if asInterface, exists := configMap["PortList"]; exists {
 		ss.portList = config.GetAsSlice(asInterface)
+	} else {
+		ss.log.Warn("Required config 'PortList' does not exist")
 	}
-	ss.configureCommonParams(configMap)
 }
 
 // Collect the receive queue size (RecvQ)
 func (ss SocketQueue) Collect() {
+	if len(ss.portList) == 0 {
+		ss.log.Warn("At least one port must be specified in the config")
+		return
+	}
+
 	/** Run the command 'ss -ntl sport = :<port_num> | sport = :<port_num> ...'
 	    to obtain the recvQ value
 	*/

@@ -13,7 +13,8 @@ func getSocketQueueCollector() *SocketQueue {
 	return newSocketQueue(make(chan metric.Metric), 10, l.WithField("testing", "socket_queue")).(*SocketQueue)
 }
 
-var socketStatsOut =`LISTEN      10      128     *:9080    *:*
+var socketStatsOut =`State      Recv-Q Send-Q        Local Address:Port          Peer Address:Port
+LISTEN      10      128     *:9080    *:*
 LISTEN      0      128     *:1224    *:*
 LISTEN      0      128     *:1234    *:*`
 
