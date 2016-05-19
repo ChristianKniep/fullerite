@@ -55,12 +55,12 @@ func TestCollectSocketQueue(t *testing.T) {
 	c := make(chan metric.Metric)
 	sscol := newSocketQueue(c, 0, l.WithField("testing", "socket_queue")).(*SocketQueue)
 	cfg := map[string]interface{}{
-		"PortList": []string{"9080"},
+		"PortList": []string{"9080", "1234", "1224"},
 	}
 	sscol.Configure(cfg)
 	go sscol.Collect()
 
-	for i := 0; i < len(expected); i++ {
+	for range expected {
 		actual := <-sscol.Channel()
 	        assert.Contains(t, expected, actual)
 	}

@@ -69,12 +69,16 @@ func (ss SocketQueue) Collect() {
 
 func (ss SocketQueue) emitSocketQueueMetrics(output []byte) {
 	// Capture the receive queue size and the corres. port number from the output.
-	re := regexp.MustCompile("\\w+\\s+(\\w+)\\s+\\w+\\s+\\S+:(\\S+).*")
-	res := re.FindAllStringSubmatch(string(output), -1)
+	re := regexp.MustCompile(`\S+\s+(\S+)\s+\S+\s+\S+:(\S+).*`)
+	lines := strings.Split(string(output), "\n")
+
 	pmap := make(map[string]float64)
-	for _, v := range res {
-		sport, qsize := v[2], v[1]
-		pmap[sport] = util.StrToFloat(qsize)
+	for i := 1; i < len(lines); i++ {
+		res := re.FindAllStringSubmatch(lines[i], -1)
+		for _, v := range res {
+			sport, qsize := v[2], v[1]
+			pmap[sport] = util.StrToFloat(qsize)
+		}
 	}
 
 	for sport, qsize := range pmap {
