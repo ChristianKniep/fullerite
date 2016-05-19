@@ -56,7 +56,7 @@ func (ss SocketQueue) Collect() {
 	/** Run the command 'ss -ntl sport = :<port_num> | sport = :<port_num> ...'
 	    to obtain the recvQ value
 	*/
-        cmdArgs := "-ntl sport = :" +  strings.Join(ss.portList, "| sport = :" )
+	cmdArgs := "-ntl sport = :" +  strings.Join(ss.portList, "| sport = :" )
 
 	cmd := exec.Command("ss", cmdArgs)
 	output, err := cmdOutput(cmd)
