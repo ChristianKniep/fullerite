@@ -71,7 +71,10 @@ type nestedMetricMap struct {
 }
 
 // Parser map for schema matching
-var schemaMap map[string]func(*[]byte) ([]metric.Metric, error)
+var (
+	schemaMap                map[string]func(*[]byte) ([]metric.Metric, error)
+	enableCumulativeCounters bool
+)
 
 func init() {
 	RegisterCollector("NerveUWSGI", newNerveUWSGI)
@@ -159,6 +162,11 @@ func (n *nerveUWSGICollector) Configure(configMap map[string]interface{}) {
 	if val, exists := configMap["configFilePath"]; exists {
 		n.configFilePath = val.(string)
 	}
+	if val, exists := configMap["enableCumulativeCounters"]; exists {
+		enableCumulativeCounters = val.(bool)
+	} else {
+		enableCumulativeCounters = false
+	}
 
 	n.configureCommonParams(configMap)
 }
@@ -196,11 +204,11 @@ func parseUWSGIMetrics10(raw *[]byte) ([]metric.Metric, error) {
 		results = append(results, metrics...)
 	}
 
-	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge), "gauge")
-	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge), "meter")
-	appendIt(convertToMetrics(&parsed.Counters, metric.Counter), "counter")
-	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge), "histogram")
-	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge), "timer")
+	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge, "gauge"), "gauge")
+	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge, "meter"), "meter")
+	appendIt(convertToMetrics(&parsed.Counters, metric.Counter, "counter"), "counter")
+	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge, "histogram"), "histogram")
+	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge, "timer"), "timer")
 
 	return results, nil
 }
@@ -221,11 +229,11 @@ func parseUWSGIMetrics11(raw *[]byte) ([]metric.Metric, error) {
 		results = append(results, metrics...)
 	}
 
-	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge), "gauge")
-	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge), "meter")
-	appendIt(convertToMetrics(&parsed.Counters, metric.Counter), "counter")
-	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge), "histogram")
-	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge), "timer")
+	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge, "gauge"), "gauge")
+	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge, "meter"), "meter")
+	appendIt(convertToMetrics(&parsed.Counters, metric.Counter, "counter"), "counter")
+	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge, "histogram"), "histogram")
+	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge, "timer"), "timer")
 
 	// This is necessary as Go doesn't allow us to type assert
 	// map[string]interface{} as map[string]string.
@@ -249,11 +257,11 @@ func parseUWSGIMetrics11(raw *[]byte) ([]metric.Metric, error) {
 // automatiically it appends the dimensions::
 //		- rollup: the value in the nested map (e.g. "count", "mean_rate")
 //		- collector: this collector's name
-func convertToMetrics(metricMap *map[string]map[string]interface{}, metricType string) []metric.Metric {
+func convertToMetrics(metricMap *map[string]map[string]interface{}, metricType string, uwsgiMetricType string) []metric.Metric {
 	results := []metric.Metric{}
 
 	for metricName, metricData := range *metricMap {
-		tempResults := metricFromMap(metricData, metricName, metricType)
+		tempResults := metricFromMap(metricData, metricName, metricType, uwsgiMetricType)
 		results = append(results, tempResults...)
 	}
 
@@ -266,11 +274,13 @@ func convertToMetrics(metricMap *map[string]map[string]interface{}, metricType s
 //    "mean_rate": 100
 // }
 // and metricname and metrictype and returns metrics for each name:rollup pair
-func metricFromMap(metricMap map[string]interface{}, metricName string, metricType string) []metric.Metric {
+func metricFromMap(metricMap map[string]interface{}, metricName string, metricType string, uwsgiMetricType string) []metric.Metric {
 	results := []metric.Metric{}
+	var mName, mType string
 
 	for rollup, value := range metricMap {
-		tempMetric, ok := createMetricFromDatam(rollup, value, metricName, metricType)
+		mName, mType = getMetricInfo(metricName, metricType, uwsgiMetricType, rollup)
+		tempMetric, ok := createMetricFromDatam(rollup, value, mName, mType)
 		if ok {
 			results = append(results, tempMetric)
 		}
@@ -483,7 +493,7 @@ func collectGauge(jsonMap map[string]interface{}, metricName []string,
 
 	if _, ok := jsonMap["value"]; ok {
 		compositeMetricName := strings.Join(metricName, ".")
-		return metricFromMap(jsonMap, compositeMetricName, metricType)
+		return metricFromMap(jsonMap, compositeMetricName, metricType, "gauge")
 	}
 	return []metric.Metric{}
 }
@@ -539,7 +549,7 @@ func collectCounter(jsonMap map[string]interface{}, metricName []string,
 
 	if _, ok := jsonMap["count"]; ok {
 		compositeMetricName := strings.Join(metricName, ".")
-		return metricFromMap(jsonMap, compositeMetricName, metricType)
+		return metricFromMap(jsonMap, compositeMetricName, metricType, "counter")
 	}
 	return []metric.Metric{}
 }
@@ -621,4 +631,12 @@ func checkForMeterUnits(jsonMap map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+func getMetricInfo(metricName, metricType, uwsgiMetricType, rollup string) (string, string) {
+	if enableCumulativeCounters && ((uwsgiMetricType == "meter" || uwsgiMetricType == "timer") && rollup == "count") {
+		return metricName + ".count", metric.CumulativeCounter
+	}
+
+	return metricName, metricType
 }

@@ -305,7 +305,7 @@ func TestUWSGIMetricConversion(t *testing.T) {
 		"units": "events/second",
 	}
 
-	actual := convertToMetrics(&testMeters, "metricType")
+	actual := convertToMetrics(&testMeters, "metricType", "meter")
 
 	// only the numbers are made
 	assert.Equal(t, 10, len(actual))
@@ -339,6 +339,77 @@ func TestUWSGIMetricConversion(t *testing.T) {
 			}[rollup]
 			assert.True(t, exists, "unknown rollup "+rollup)
 			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
+		default:
+			t.Fatalf("unknown metric name %s", m.Name)
+		}
+	}
+}
+
+func TestUWSGIMetricConversionCumulativeCountersEnabled(t *testing.T) {
+	cfg := map[string]interface{}{
+		"enableCumulativeCounters": true,
+	}
+
+	inst := getTestNerveUWSGI()
+	inst.Configure(cfg)
+
+	testMeters := make(map[string]map[string]interface{})
+	testMeters["pyramid_uwsgi_metrics.tweens.5xx-responses"] = map[string]interface{}{
+		"count":     957,
+		"mean_rate": 0.0006172935981330262,
+		"m15_rate":  2.8984757611832113e-41,
+		"m5_rate":   1.8870959302511822e-119,
+		"m1_rate":   3e-323,
+
+		// this will not create a metric
+		"units": "events/second",
+	}
+	testMeters["pyramid_uwsgi_metrics.tweens.4xx-responses"] = map[string]interface{}{
+		"count":     366116,
+		"mean_rate": 0.2333071157843687,
+		"m15_rate":  0.22693345170298124,
+		"m5_rate":   0.21433439128223822,
+		"m1_rate":   0.14771304656654516,
+
+		// this will not create a metric
+		"units": "events/second",
+	}
+
+	actual := convertToMetrics(&testMeters, "metricType", "meter")
+
+	for _, m := range actual {
+		rollup, _ := m.GetDimensionValue("rollup")
+		switch m.Name {
+		case "pyramid_uwsgi_metrics.tweens.5xx-responses":
+			val, exists := map[string]float64{
+				"mean_rate": 0.0006172935981330262,
+				"m15_rate":  2.8984757611832113e-41,
+				"m5_rate":   1.8870959302511822e-119,
+				"m1_rate":   3e-323,
+			}[rollup]
+			assert.True(t, exists, "unknown rollup "+rollup)
+			assert.Equal(t, val, m.Value)
+		case "pyramid_uwsgi_metrics.tweens.4xx-responses":
+			val, exists := map[string]float64{
+				"mean_rate": 0.2333071157843687,
+				"m15_rate":  0.22693345170298124,
+				"m5_rate":   0.21433439128223822,
+				"m1_rate":   0.14771304656654516,
+			}[rollup]
+			assert.True(t, exists, "unknown rollup "+rollup)
+			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
+		case "pyramid_uwsgi_metrics.tweens.5xx-responses.count":
+			val, exists := map[string]float64{
+				"count": 957,
+			}[rollup]
+			assert.True(t, exists, "unknown rollup "+rollup)
+			assert.Equal(t, val, m.Value)
+		case "pyramid_uwsgi_metrics.tweens.4xx-responses.count":
+			val, exists := map[string]float64{
+				"count": 366116,
+			}[rollup]
+			assert.True(t, exists, "unknown rollup "+rollup)
+			assert.Equal(t, val, m.Value)
 		default:
 			t.Fatalf("unknown metric name %s", m.Name)
 		}
