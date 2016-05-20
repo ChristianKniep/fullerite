@@ -11,4 +11,3 @@ func StrToFloat(val string) float64 {
 	}
 	return 0
 }
-
