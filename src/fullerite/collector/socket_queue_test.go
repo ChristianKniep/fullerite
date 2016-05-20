@@ -13,7 +13,7 @@ func getSocketQueueCollector() *SocketQueue {
 	return newSocketQueue(make(chan metric.Metric), 10, l.WithField("testing", "socket_queue")).(*SocketQueue)
 }
 
-var socketStatsOut =`State      Recv-Q Send-Q        Local Address:Port          Peer Address:Port
+var socketStatsOut = `State      Recv-Q Send-Q        Local Address:Port          Peer Address:Port
 LISTEN      10      128     *:9080    *:*
 LISTEN      0      128     *:1224    *:*
 LISTEN      0      128     *:1234    *:*`
@@ -47,9 +47,9 @@ func TestCollectSocketQueue(t *testing.T) {
 	}
 
 	expected := []metric.Metric{
-		metric.Metric{Name: "sq.listen", MetricType: "gauge", Value: 10, Dimensions: map[string]string{"port":"9080"}},
-		metric.Metric{Name: "sq.listen", MetricType: "gauge", Value: 0, Dimensions: map[string]string{"port":"1234"}},
-		metric.Metric{Name: "sq.listen", MetricType: "gauge", Value: 0, Dimensions: map[string]string{"port":"1224"}},
+		metric.Metric{Name: "sq.listen", MetricType: "gauge", Value: 10, Dimensions: map[string]string{"port": "9080"}},
+		metric.Metric{Name: "sq.listen", MetricType: "gauge", Value: 0, Dimensions: map[string]string{"port": "1234"}},
+		metric.Metric{Name: "sq.listen", MetricType: "gauge", Value: 0, Dimensions: map[string]string{"port": "1224"}},
 	}
 
 	c := make(chan metric.Metric)
@@ -62,6 +62,6 @@ func TestCollectSocketQueue(t *testing.T) {
 
 	for range expected {
 		actual := <-sscol.Channel()
-	        assert.Contains(t, expected, actual)
+		assert.Contains(t, expected, actual)
 	}
 }
