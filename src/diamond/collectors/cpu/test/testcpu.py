@@ -59,11 +59,11 @@ class TestCPUCollector(CollectorTestCase):
         patch_open.stop()
 
         self.assertPublishedMany(publish_mock, {
-            'total.idle': 4.0,
-            'total.iowait': 5.0,
-            'total.nice': 2.0,
-            'total.system': 3.0,
-            'total.user': 1.0
+            'cpu.total.idle': 440,
+            'cpu.total.iowait': 550,
+            'cpu.total.nice': 220,
+            'cpu.total.system': 330,
+            'cpu.total.user': 110
         })
 
     @patch.object(Collector, 'publish')
@@ -77,11 +77,11 @@ class TestCPUCollector(CollectorTestCase):
         self.collector.collect()
 
         metrics = {
-            'total.idle': 2440.8,
-            'total.iowait': 0.2,
-            'total.nice': 0.0,
-            'total.system': 0.2,
-            'total.user': 0.4
+            'cpu.total.idle': 3925832001,
+            'cpu.total.iowait': 575306,
+            'cpu.total.nice': 1104382,
+            'cpu.total.system': 8454154,
+            'cpu.total.user': 29055791
         }
 
         self.setDocExample(collector=self.collector.__class__.__name__,
@@ -92,6 +92,7 @@ class TestCPUCollector(CollectorTestCase):
     @patch.object(Collector, 'publish')
     def test_should_work_with_ec2_data(self, publish_mock):
         self.collector.config['interval'] = 30
+        self.collector.config['xenfix'] = False
         patch_open = patch('os.path.isdir', Mock(return_value=True))
         patch_open.start()
 
@@ -106,52 +107,14 @@ class TestCPUCollector(CollectorTestCase):
         patch_open.stop()
 
         metrics = {
-            'total.idle': 68.4,
-            'total.iowait': 0.6,
-            'total.nice': 0.0,
-            'total.system': 13.7,
-            'total.user': 16.666666666666668
+            'cpu.total.idle': 2806608501,
+            'cpu.total.iowait': 13567144,
+            'cpu.total.nice': 15545,
+            'cpu.total.system': 170762788,
+            'cpu.total.user': 243646997
         }
 
         self.assertPublishedMany(publish_mock, metrics)
-
-    @patch.object(Collector, 'publish')
-    def test_473(self, publish_mock):
-        """
-        No cpu value should ever be over 100
-        """
-        self.collector.config['interval'] = 60
-        patch_open = patch('os.path.isdir', Mock(return_value=True))
-        patch_open.start()
-
-        CPUCollector.PROC = self.getFixturePath('473_1')
-        self.collector.collect()
-
-        self.assertPublishedMany(publish_mock, {})
-
-        CPUCollector.PROC = self.getFixturePath('473_2')
-        self.collector.collect()
-
-        patch_open.stop()
-
-        totals = {}
-
-        for call in publish_mock.mock_calls:
-            call = call[1]
-            if call[0][:6] == 'total.':
-                continue
-            if call[1] > 100:
-                raise ValueError("metric %s: %s should not be over 100!" % (
-                    call[0], call[1]))
-            k = call[0][:4]
-            totals[k] = totals.get(k, 0) + call[1]
-
-        for t in totals:
-            # Allow rounding errors
-            if totals[t] >= 101:
-                raise ValueError(
-                    "metric total for %s: %s should not be over 100!" % (
-                        t, totals[t]))
 
 
 class TestCPUCollectorNormalize(CollectorTestCase):
@@ -180,15 +143,18 @@ class TestCPUCollectorNormalize(CollectorTestCase):
             'system': 330,
             'idle': 440,
         }
-        # expected increment, divided by number of CPUs
-        # for example, user should be 10/2 = 5
         self.expected = {
-            'total.user': 5.0,
-            'total.nice': 10.0,
-            'total.system': 15.0,
-            'total.idle': 20.0,
+            'cpu.total.user': 110,
+            'cpu.total.nice': 220,
+            'cpu.total.system': 330,
+            'cpu.total.idle': 440,
         }
-
+        self.expected2 = {
+            'cpu.total.user': 55,
+            'cpu.total.nice': 110,
+            'cpu.total.system': 165,
+            'cpu.total.idle': 220,
+        }
     # convert an input dict with values to a string that might come from
     # /proc/stat
     def input_dict_to_proc_string(self, cpu_id, dict_):
@@ -254,7 +220,7 @@ class TestCPUCollectorNormalize(CollectorTestCase):
 
         self.collector.collect()
 
-        self.assertPublishedMany(publish_mock, self.expected)
+        self.assertPublishedMany(publish_mock, self.expected2)
 
 ################################################################################
 if __name__ == "__main__":
