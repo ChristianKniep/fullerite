@@ -5,6 +5,7 @@ import (
 	"fullerite/util"
 
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -304,9 +305,10 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 	}
 
 	rsp, err := client.Get(endpoint)
-	//TODO: Insert check for 4xx
+
 	if (err == nil) && (rsp.StatusCode != 200) {
-		return []byte{}, "Non 200 Status Code. ", err
+		err := errors.New("Non 200 Status Code")
+		return []byte{}, "", err
 	}
 
 	if err != nil {
