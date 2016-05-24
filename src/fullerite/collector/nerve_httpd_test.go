@@ -45,14 +45,16 @@ func TestDefaultConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, time.Duration(1)*time.Hour, collector.statusTTL)
 	assert.Equal(t, "localhost", collector.host)
 	assert.Equal(t, "NerveHTTPD", collector.Name())
+	assert.Nil(t, collector.servicesWhitelist)
 }
 
 func TestCustomConfigNerveHTTPD(t *testing.T) {
 	collector := getNerveHTTPDCollector()
 	configMap := map[string]interface{}{
-		"status_ttl":     120,
-		"configFilePath": "/tmp/foobar",
-		"host":           "169.0.0.1",
+		"status_ttl":        120,
+		"configFilePath":    "/tmp/foobar",
+		"host":              "169.0.0.1",
+		"servicesWhitelist": []string{"serv1", "serv2"},
 	}
 	collector.Configure(configMap)
 
@@ -61,6 +63,7 @@ func TestCustomConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, "server-status?auto", collector.queryPath)
 	assert.Equal(t, time.Duration(120)*time.Second, collector.statusTTL)
 	assert.Equal(t, "169.0.0.1", collector.host)
+	assert.Equal(t, []string{"serv1", "serv2"}, collector.servicesWhitelist)
 }
 
 func TestExtractApacheMetrics(t *testing.T) {
