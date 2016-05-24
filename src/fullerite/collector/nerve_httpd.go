@@ -126,7 +126,7 @@ func (c *NerveHTTPD) Collect() {
 	c.log.Debug("Finished parsing Nerve config into ", servicePortMap)
 
 	for port, serviceName := range servicePortMap {
-		if c.servicesWhitelist == nil || c.serviceInWhitelist(serviceName) {
+		if len(c.servicesWhitelist) == 0 || c.serviceInWhitelist(serviceName) {
 			if !c.checkIfFailed(serviceName, port) {
 				go c.emitHTTPDMetric(serviceName, port)
 			}
