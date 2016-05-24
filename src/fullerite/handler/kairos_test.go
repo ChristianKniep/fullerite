@@ -142,3 +142,45 @@ func TestKairosServerErrorParse(t *testing.T) {
 
 	assert.Equal(t, k.parseServerError(string(errByt), series), string(expectByt))
 }
+
+func TestSanitizeMetricName(t *testing.T) {
+	k := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New("Test==:")
+	m1.AddDimension("somedim", "value")
+	s1 := k.convertToKairos(m1)
+
+	m2 := metric.New("Test---")
+	m2.AddDimension("somedim", "value")
+	s2 := k.convertToKairos(m2)
+
+	assert.Equal(t, s1, s2, "metric name should be sanitazed")
+}
+
+func TestSanitizeMetricDimensionName(t *testing.T) {
+	k := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "valu=")
+	s1 := k.convertToKairos(m1)
+
+	m2 := metric.New("Test")
+	m2.AddDimension("some-dim", "valu-")
+	s2 := k.convertToKairos(m2)
+
+	assert.Equal(t, s1, s2, "metric dimension should be sanitazed")
+}
+
+func TestSanitizeMetricDimensionValue(t *testing.T) {
+	k := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "valu=")
+	s1 := k.convertToKairos(m1)
+
+	m2 := metric.New("Test")
+	m2.AddDimension("some-dim", "valu-")
+	s2 := k.convertToKairos(m2)
+
+	assert.Equal(t, s1, s2, "metric dimension should be sanitazed")
+}

@@ -2,6 +2,7 @@ package util
 
 import (
 	"strconv"
+	"strings"
 )
 
 // StrToFloat converts a string value to float
@@ -10,4 +11,11 @@ func StrToFloat(val string) float64 {
 		return i
 	}
 	return 0
+}
+
+// StrSanitize enables handler lever sanitation
+func StrSanitize(s string) string {
+	s = strings.Replace(s, "=", "-", -1)
+	s = strings.Replace(s, ":", "-", -1)
+	return s
 }
