@@ -44,6 +44,7 @@ class CPUCollector(diamond.collector.Collector):
             'percore':  'Collect metrics per cpu core or just total',
             'simple':   'only return aggregate CPU% metric',
             'normalize': 'for cpu totals, divide by the number of CPUs',
+            'enableAggregation': 'Sends cpu.user + cpu.nice and cpu.irq + cpu.softirq',
         })
         return config_help
 
@@ -58,6 +59,7 @@ class CPUCollector(diamond.collector.Collector):
             'xenfix':   None,
             'simple':   'False',
             'normalize': 'False',
+            'enableAggregation': 'False',
         })
         return config
 
@@ -113,7 +115,7 @@ class CPUCollector(diamond.collector.Collector):
                 cpu = elements[0]
 
                 if cpu == 'cpu':
-                   cpu = 'cpu.total'
+                    cpu = 'cpu.total'
                 elif not str_to_bool(self.config['percore']):
                     continue
 
@@ -139,6 +141,12 @@ class CPUCollector(diamond.collector.Collector):
                     results[cpu]['guest'] = elements[9]
                 if len(elements) >= 11:
                     results[cpu]['guest_nice'] = elements[10]
+
+                if results[cpu]['user'] is not None and results[cpu]['nice'] is not None:
+                    results[cpu]['user_mode'] = results[cpu]['user'] + results[cpu]['nice']
+
+                if results[cpu]['irq'] is not None and results[cpu]['softirq'] is not None:
+                    results[cpu]['irq_softirq'] = results[cpu]['irq'] + results[cpu]['softirq']
 
             # Close File
             file.close()
@@ -185,6 +193,10 @@ class CPUCollector(diamond.collector.Collector):
                     self.dimensions = {
                         'core' : str(core),
                     }
+                if (str_to_bool(self.config['enableAggregation']) is False
+                    and ('user_mode' in metric_name
+                        or 'irq_softirq' in metric_name)):
+                    continue
                 self.publish_cumulative_counter(metric_name, metric_value)
             return True
 
@@ -225,12 +237,21 @@ class CPUCollector(diamond.collector.Collector):
                 self.publish_cumulative_counter(metric_name + '.idle',
                                              cpu_time[i].idle)
 
+                if (str_to_bool(self.config['enableAggregation'])):
+                    self.publish_cumulative_counter(metric_name + '.user_mode',
+                                                cpu_time[i].user + cpu_time[i].nice)
+
             metric_name = 'cpu.total'
+            cpu_user = total_time.user / cpu_count
             self.publish_cumulative_counter(metric_name + '.user',
-                                         total_time.user / cpu_count)
+                                         cpu_user)
             if hasattr(total_time, 'nice'):
+                cpu_nice = total_time.nice / cpu_count
                 self.publish_cumulative_counter(metric_name + '.nice',
-                                             total_time.nice / cpu_count)
+                                             cpu_nice)
+                if (str_to_bool(self.config['enableAggregation'])):
+                    self.publish_cumulative_counter(metric_name + '.user_mode',
+                                                cpu_user + cpu_nice)
             self.publish_cumulative_counter(metric_name + '.system',
                                          total_time.system / cpu_count)
             self.publish_cumulative_counter(metric_name + '.idle',
