@@ -48,13 +48,14 @@ var (
 type NerveHTTPD struct {
 	baseCollector
 
-	configFilePath  string
-	queryPath       string
-	host            string
-	timeout         int
-	statusTTL       time.Duration
-	failedEndPoints map[string]int64
-	mu              *sync.RWMutex
+	configFilePath    string
+	queryPath         string
+	host              string
+	timeout           int
+	statusTTL         time.Duration
+	failedEndPoints   map[string]int64
+	mu                *sync.RWMutex
+	servicesWhitelist []string
 }
 
 type nerveHTTPDResponse struct {
@@ -89,6 +90,7 @@ func (c *NerveHTTPD) Configure(configMap map[string]interface{}) {
 	if val, exists := configMap["queryPath"]; exists {
 		c.queryPath = val.(string)
 	}
+
 	if val, exists := configMap["configFilePath"]; exists {
 		c.configFilePath = val.(string)
 	}
@@ -102,11 +104,20 @@ func (c *NerveHTTPD) Configure(configMap map[string]interface{}) {
 		c.statusTTL = time.Duration(tmpStatusTTL) * time.Second
 	}
 
+	if val, exists := configMap["servicesWhitelist"]; exists {
+		c.servicesWhitelist = config.GetAsSlice(val)
+	} else {
+		c.log.Warn("Required config does not exist for NerveHTTPD: servicesWhitelist")
+	}
+
 	c.configureCommonParams(configMap)
 }
 
 // Collect the metrics
 func (c *NerveHTTPD) Collect() {
+	if c.servicesWhitelist == nil {
+		return
+	}
 	rawFileContents, err := ioutil.ReadFile(c.configFilePath)
 	if err != nil {
 		c.log.Warn("Failed to read the contents of file ", c.configFilePath, " because ", err)
@@ -120,10 +131,21 @@ func (c *NerveHTTPD) Collect() {
 	c.log.Debug("Finished parsing Nerve config into ", servicePortMap)
 
 	for port, serviceName := range servicePortMap {
-		if !c.checkIfFailed(serviceName, port) {
-			go c.emitHTTPDMetric(serviceName, port)
+		if c.serviceInWhitelist(serviceName) {
+			if !c.checkIfFailed(serviceName, port) {
+				go c.emitHTTPDMetric(serviceName, port)
+			}
 		}
 	}
+}
+
+func (c *NerveHTTPD) serviceInWhitelist(service string) bool {
+	for _, s := range c.servicesWhitelist {
+		if s == service {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *NerveHTTPD) emitHTTPDMetric(serviceName string, port int) {
