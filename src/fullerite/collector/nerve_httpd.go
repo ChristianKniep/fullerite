@@ -106,8 +106,6 @@ func (c *NerveHTTPD) Configure(configMap map[string]interface{}) {
 
 	if val, exists := configMap["servicesWhitelist"]; exists {
 		c.servicesWhitelist = config.GetAsSlice(val)
-	} else {
-		c.log.Warn("Required config does not exist for NerveHTTPD: servicesWhitelist")
 	}
 
 	c.configureCommonParams(configMap)
@@ -115,9 +113,6 @@ func (c *NerveHTTPD) Configure(configMap map[string]interface{}) {
 
 // Collect the metrics
 func (c *NerveHTTPD) Collect() {
-	if c.servicesWhitelist == nil {
-		return
-	}
 	rawFileContents, err := ioutil.ReadFile(c.configFilePath)
 	if err != nil {
 		c.log.Warn("Failed to read the contents of file ", c.configFilePath, " because ", err)
@@ -131,7 +126,7 @@ func (c *NerveHTTPD) Collect() {
 	c.log.Debug("Finished parsing Nerve config into ", servicePortMap)
 
 	for port, serviceName := range servicePortMap {
-		if c.serviceInWhitelist(serviceName) {
+		if c.servicesWhitelist == nil || c.serviceInWhitelist(serviceName) {
 			if !c.checkIfFailed(serviceName, port) {
 				go c.emitHTTPDMetric(serviceName, port)
 			}

@@ -45,7 +45,7 @@ func TestDefaultConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, time.Duration(1)*time.Hour, collector.statusTTL)
 	assert.Equal(t, "localhost", collector.host)
 	assert.Equal(t, "NerveHTTPD", collector.Name())
-	assert.Nil(t, collector.servicesWhitelist, "servicesWhitelist should be nil")
+	assert.Nil(t, collector.servicesWhitelist)
 }
 
 func TestCustomConfigNerveHTTPD(t *testing.T) {
@@ -128,9 +128,8 @@ func TestNerveHTTPDCollect(t *testing.T) {
 	assert.Nil(t, err)
 
 	cfg := map[string]interface{}{
-		"configFilePath":    tmpFile.Name(),
-		"queryPath":         "",
-		"servicesWhitelist": []string{"test_service"},
+		"configFilePath": tmpFile.Name(),
+		"queryPath":      "",
 	}
 
 	inst := getNerveHTTPDCollector()
