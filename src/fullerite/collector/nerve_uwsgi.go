@@ -306,9 +306,14 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 
 	rsp, err := client.Get(endpoint)
 
+	if rsp == nil {
+		err := errors.New("No endpoint response")
+		return []byte{}, "", err	
+	}
+
 	defer rsp.Body.Close()
 
-	if rsp != nil && rsp.StatusCode != 200 {
+	if rsp.StatusCode != 200 {
 		err := errors.New("Non 200 Status Code")
 		return []byte{}, "", err
 	}
