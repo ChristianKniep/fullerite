@@ -356,6 +356,17 @@ func TestUWSGIResponseConversion(t *testing.T) {
 	}
 }
 
+func TestErrorQueryEndpointResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
+	endpoint := ts.URL + "/server-status?auto=close"
+	ts.Close()
+
+	_, _, queryEndpointError := queryEndpoint(endpoint, 10)
+	assert.NotNil(t, queryEndpointError)
+}
+
 func TestNerveUWSGICollect(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
 		// fmt.Println("MARRRRP")
