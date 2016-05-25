@@ -357,14 +357,26 @@ func TestUWSGIResponseConversion(t *testing.T) {
 }
 
 func TestErrorQueryEndpointResponse(t *testing.T) {
+	//4xx HTTP status code test
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 	}))
-	endpoint := ts.URL + "/server-status?auto=close"
+	endpoint := ts.URL + "/status/metrics"
 	ts.Close()
 
 	_, _, queryEndpointError := queryEndpoint(endpoint, 10)
 	assert.NotNil(t, queryEndpointError)
+
+	//Socket closed test
+	tsClosed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	tsClosed.Close()
+	closedEndpoint := tsClosed.URL + "/status/metrics"
+	_, queryClosedEndpointResponse, queryClosedEndpointError := queryEndpoint(closedEndpoint, 10)
+	assert.NotNil(t, queryClosedEndpointError)
+	assert.Equal(t, "", queryClosedEndpointResponse)
+
 }
 
 func TestNerveUWSGICollect(t *testing.T) {
