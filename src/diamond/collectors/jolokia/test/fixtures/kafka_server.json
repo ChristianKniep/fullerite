@@ -56,6 +56,26 @@
     "kafka.server:name=PartitionCount,type=ReplicaManager": {
       "Value": 0
     },
+    "kafka.server:brokerHost=localhost,brokerPort=9092,name=FetchRequestRateAndTimeMs,type=FetchRequestAndResponseMetrics": {
+      "StdDev": 154.52722275098708,
+      "75thPercentile": 247.7427925,
+      "Mean": 157.7220694057428,
+      "LatencyUnit": "MILLISECONDS",
+      "RateUnit": "SECONDS",
+      "98thPercentile": 447.94183213999986,
+      "99thPercentile": 481.4128502800001,
+      "95thPercentile": 373.1351058999997,
+      "EventType": "calls",
+      "Max": 7356.408488,
+      "Count": 22236754,
+      "FiveMinuteRate": 6.928222978602735,
+      "MeanRate": 5.948752719311909,
+      "50thPercentile": 76.127467,
+      "OneMinuteRate": 6.585503543626159,
+      "Min": 5.06869,
+      "999thPercentile": 551.1313053900001,
+      "FifteenMinuteRate": 7.093613545816686
+    },
     "kafka.server:name=FollowerExpiresPerSecond,type=DelayedFetchRequestMetrics": {
       "MeanRate": 0.0,
       "FiveMinuteRate": 0.0,
