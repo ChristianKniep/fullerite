@@ -143,10 +143,10 @@ class CPUCollector(diamond.collector.Collector):
                     results[cpu]['guest_nice'] = elements[10]
 
                 if results[cpu]['user'] is not None and results[cpu]['nice'] is not None:
-                    results[cpu]['user_mode'] = results[cpu]['user'] + results[cpu]['nice']
+                    results[cpu]['user_mode'] = float(results[cpu]['user']) + float(results[cpu]['nice'])
 
                 if results[cpu]['irq'] is not None and results[cpu]['softirq'] is not None:
-                    results[cpu]['irq_softirq'] = results[cpu]['irq'] + results[cpu]['softirq']
+                    results[cpu]['irq_softirq'] = float(results[cpu]['irq']) + float(results[cpu]['softirq'])
 
             # Close File
             file.close()
@@ -239,7 +239,7 @@ class CPUCollector(diamond.collector.Collector):
 
                 if (str_to_bool(self.config['enableAggregation'])):
                     self.publish_cumulative_counter(metric_name + '.user_mode',
-                                                cpu_time[i].user + cpu_time[i].nice)
+                                                float(cpu_time[i].user) + float(cpu_time[i].nice))
 
             metric_name = 'cpu.total'
             cpu_user = total_time.user / cpu_count
