@@ -5,8 +5,8 @@ import (
 	"fullerite/util"
 
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -306,12 +306,19 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 
 	rsp, err := client.Get(endpoint)
 
-	if (err == nil) && (rsp.StatusCode != 200) {
-		err := errors.New("Non 200 Status Code")
-		return []byte{}, "", err
+	if rsp != nil {
+		defer func() {
+			io.Copy(ioutil.Discard, rsp.Body)
+			rsp.Body.Close()
+		}()
 	}
 
 	if err != nil {
+		return []byte{}, "", err
+	}
+
+	if rsp != nil && rsp.StatusCode != 200 {
+		err := fmt.Errorf("%s returned %d error code", endpoint, rsp.StatusCode)
 		return []byte{}, "", err
 	}
 
@@ -321,7 +328,6 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 	}
 
 	txt, err := ioutil.ReadAll(rsp.Body)
-	defer rsp.Body.Close()
 	if err != nil {
 		return []byte{}, "", err
 	}
