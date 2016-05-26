@@ -35,8 +35,9 @@ class KafkaJolokiaCollector(JolokiaCollector):
         if isinstance(obj, dict) and "Count" in obj:
             if "Mean" in obj:
                 for metric_key in self.TIMER_METRICS:
-                    metric_value = obj[metric_key]
-                    self.parse_dimension_bean(prefix, metric_key.lower(), metric_value)
+                    metric_value = obj.get(metric_key)
+                    if metric_value:
+                        self.parse_dimension_bean(prefix, metric_key.lower(), metric_value)
             else:
                 counter_val = obj["Count"]
                 self.parse_dimension_bean(prefix, "count", counter_val)
