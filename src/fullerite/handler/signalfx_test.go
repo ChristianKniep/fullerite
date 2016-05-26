@@ -94,3 +94,16 @@ func TestSignalFxRun(t *testing.T) {
 		t.Fatal("Failed to post and handle after 2 seconds")
 	}
 }
+
+func TestSignalFxDimensionsOverwriting(t *testing.T) {
+	s := getTestSignalfxHandler(12, 12, 12)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "first value")
+	m1.AddDimension("some-dim", "second value")
+	datapoint := s.convertToProto(m1)
+
+	dimensions := datapoint.GetDimensions()
+	assert.Equal(t, 1, len(dimensions), "there should be only one dimension")
+	assert.Equal(t, "second value", dimensions[0].GetValue(), "the correct name must be second vale")
+}

@@ -1,5 +1,7 @@
 package metric
 
+import "fullerite/util"
+
 // The different types of metrics that are supported
 const (
 	Gauge             = "gauge"
@@ -36,7 +38,7 @@ func WithValue(name string, value float64) Metric {
 
 // AddDimension adds a new dimension to the Metric.
 func (m *Metric) AddDimension(name, value string) {
-	m.Dimensions[name] = value
+	m.Dimensions[util.StrSanitize(name)] = value
 }
 
 // RemoveDimension removes a dimension from the Metric.
@@ -65,6 +67,7 @@ func (m *Metric) GetDimensions(defaults map[string]string) (dimensions map[strin
 
 // GetDimensionValue returns the value of a dimension if it's set.
 func (m *Metric) GetDimensionValue(dimension string) (value string, ok bool) {
+	dimension = util.StrSanitize(dimension)
 	value, ok = m.Dimensions[dimension]
 	return
 }
