@@ -193,6 +193,8 @@ class CPUCollector(diamond.collector.Collector):
                     self.dimensions = {
                         'core' : str(core),
                     }
+                else:
+                    self.dimensions = None
                 if (str_to_bool(self.config['enableAggregation']) is False
                     and ('user_mode' in metric_name
                         or 'irq_softirq' in metric_name)):
