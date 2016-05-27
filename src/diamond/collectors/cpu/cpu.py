@@ -185,6 +185,10 @@ class CPUCollector(diamond.collector.Collector):
 
             for metric_name in metrics.keys():
                 metric_value = metrics[metric_name]
+                if (str_to_bool(self.config['enableAggregation']) is False
+                    and ('user_mode' in metric_name
+                        or 'irq_softirq' in metric_name)):
+                    continue
                 if 'cpu.total' not in metric_name:
                     metric_name, stat = metric_name.split('.')
                     core = metric_name[3:]
@@ -193,12 +197,6 @@ class CPUCollector(diamond.collector.Collector):
                     self.dimensions = {
                         'core' : str(core),
                     }
-                else:
-                    self.dimensions = None
-                if (str_to_bool(self.config['enableAggregation']) is False
-                    and ('user_mode' in metric_name
-                        or 'irq_softirq' in metric_name)):
-                    continue
                 self.publish_cumulative_counter(metric_name, metric_value)
             return True
 
