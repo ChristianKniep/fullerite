@@ -18,6 +18,9 @@ from cpu import CPUCollector
 
 ################################################################################
 
+def find_metric(metric_list, metric_name):
+    return filter(lambda metric:metric["name"].find(metric_name) > -1, metric_list)
+
 
 class TestCPUCollector(CollectorTestCase):
     def setUp(self):
@@ -116,6 +119,120 @@ class TestCPUCollector(CollectorTestCase):
 
         self.assertPublishedMany(publish_mock, metrics)
 
+    @patch.object(Collector, 'publish')
+    def test_total_metrics_enable_aggregation_false(self, publish_mock):
+        self.collector.config['enableAggregation'] = False
+
+        CPUCollector.PROC = self.getFixturePath('proc_stat_2')
+        self.collector.collect()
+
+        publishedMetrics = {
+            'cpu.total.nice': 1104382,
+            'cpu.total.irq': 3,
+            'cpu.total.softirq': 59032,
+            'cpu.total.user': 29055791
+        }
+        unpublishedMetrics = {
+            'cpu.total.user_mode': 30160173,
+            'cpu.total.irq_softirq': 59035
+        }
+
+        self.assertPublishedMany(publish_mock, publishedMetrics)
+
+        self.collector.collect()
+        self.assertUnpublishedMany(publish_mock, unpublishedMetrics)
+
+    @patch.object(Collector, 'publish')
+    def test_total_metrics_enable_aggregation_true(self, publish_mock):
+        self.collector.config['enableAggregation'] = True
+
+        CPUCollector.PROC = self.getFixturePath('proc_stat_2')
+        self.collector.collect()
+
+        publishedMetrics = {
+            'cpu.total.nice': 1104382,
+            'cpu.total.irq': 3,
+            'cpu.total.softirq': 59032,
+            'cpu.total.user': 29055791,
+            'cpu.total.user_mode': 30160173,
+            'cpu.total.irq_softirq': 59035
+        }
+
+        self.assertPublishedMany(publish_mock, publishedMetrics)
+
+    @patch.object(Collector, 'publish')
+    def test_total_metrics_enable_aggregation_true_blacklist(self, publish_mock):
+        self.collector.config['enableAggregation'] = True
+
+        CPUCollector.PROC = self.getFixturePath('proc_stat_2')
+        self.collector.collect()
+
+        publishedMetrics = {
+            'cpu.total.nice': 1104382,
+            'cpu.total.irq': 3,
+            'cpu.total.softirq': 59032,
+            'cpu.total.user': 29055791,
+            'cpu.total.user_mode': 30160173,
+            'cpu.total.irq_softirq': 59035
+        }
+
+        self.assertPublishedMany(publish_mock, publishedMetrics)
+
+    @patch.object(Collector, 'publish')
+    def test_core_metrics_enable_aggregation_false(self, publish_mock):
+        self.collector.config['enableAggregation'] = False
+
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu0 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+
+        publishedMetrics = {
+            'cpu.nice': 220,
+            'cpu.irq': 660,
+            'cpu.softirq': 770,
+            'cpu.user': 110
+        }
+
+        self.assertPublishedMany(publish_mock, publishedMetrics)
+
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu0 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+        unpublishedMetrics = {
+
+            'cpu.user_mode': 330,
+            'cpu.irq_softirq': 1430
+        }
+
+        self.assertUnpublishedMany(publish_mock, unpublishedMetrics)
+
+    @patch.object(Collector, 'publish')
+    def test_core_metrics_enable_aggregation_true(self, publish_mock):
+        self.collector.config['enableAggregation'] = True
+
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu0 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+
+        publishedMetrics = {
+            'cpu.nice': 220,
+            'cpu.irq': 660,
+            'cpu.softirq': 770,
+            'cpu.user': 110,
+            'cpu.user_mode': 330,
+            'cpu.irq_softirq': 1430
+        }
+
+        self.assertPublishedMany(publish_mock, publishedMetrics)
 
 class TestCPUCollectorNormalize(CollectorTestCase):
 
@@ -221,6 +338,78 @@ class TestCPUCollectorNormalize(CollectorTestCase):
         self.collector.collect()
 
         self.assertPublishedMany(publish_mock, self.expected2)
+
+
+class TestCPUCollectorDimensions(CollectorTestCase):
+    def setUp(self):
+        config = get_collector_config('CPUCollector', {
+            'interval': 10,
+            'normalize': False
+        })
+
+        self.collector = CPUCollector(config, None)
+
+    @patch.object(Collector, 'flush')
+    def test_core_dimension_core_metrics(self, publish_mock):
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu0 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+
+        for metric_name in ['cpu.user', 'cpu.idle', 'cpu.nice', 'cpu.softirq']:
+            metrics = find_metric(self.collector.payload, metric_name)
+
+            self.assertEqual(len(metrics), 1)
+            self.assertTrue(metrics[0]['dimensions'].has_key('core'))
+
+    @patch.object(Collector, 'flush')
+    def test_core_dimension_total_metrics(self, publish_mock):
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+
+        for metric_name in ['cpu.total.user', 'cpu.total.idle', 'cpu.total.nice', 'cpu.total.softirq']:
+            metrics = find_metric(self.collector.payload, metric_name)
+
+            self.assertEqual(len(metrics), 1)
+            self.assertFalse(metrics[0]['dimensions'].has_key('core'))
+
+    @patch.object(Collector, 'flush')
+    def test_core_dimension_core_metrics_aggregated(self, publish_mock):
+        self.collector.config['enableAggregation'] = True
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu0 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+
+        for metric_name in ['cpu.user_mode', 'cpu.idle', 'cpu.nice', 'cpu.irq_softirq']:
+            metrics = find_metric(self.collector.payload, metric_name)
+
+            self.assertEqual(len(metrics), 1)
+            self.assertTrue(metrics[0]['dimensions'].has_key('core'))
+
+    @patch.object(Collector, 'flush')
+    def test_core_dimension_total_metrics_aggregated(self, publish_mock):
+        self.collector.config['enableAggregation'] = True
+        patch_open = patch('__builtin__.open', Mock(return_value=StringIO(
+            'cpu 110 220 330 440 550 660 770 0 0 0')))
+
+        patch_open.start()
+        self.collector.collect()
+        patch_open.stop()
+
+        for metric_name in ['cpu.total.user_mode', 'cpu.total.idle', 'cpu.total.nice', 'cpu.total.irq_softirq']:
+            metrics = find_metric(self.collector.payload, metric_name)
+
+            self.assertEqual(len(metrics), 1)
+            self.assertFalse(metrics[0]['dimensions'].has_key('core'))
 
 ################################################################################
 if __name__ == "__main__":
