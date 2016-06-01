@@ -86,6 +86,12 @@ func (col *baseCollector) configureCommonParams(configMap map[string]interface{}
 	if interval, exists := configMap["interval"]; exists {
 		col.interval = config.GetAsInt(interval, DefaultCollectionInterval)
 	}
+
+	if prefix, exists := configMap["prefix"]; exists {
+		if str, ok := prefix.(string); ok {
+			col.prefix = str
+		}
+	}
 }
 
 // SetInterval : set the interval to collect on
