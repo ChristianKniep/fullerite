@@ -16,7 +16,7 @@ var ipGetter = getIps
 //     	"heartbeat_path": "/var/run/nerve/heartbeat",
 //		"instance_id": "srv1-devc",
 //		"services": {
-//	 		"<SERVICE_NAME>.<otherstuff>": {
+//	 		"<SERVICE_NAME>.<NAMESPACE>.<otherstuff>": {
 //				"host": "<IPADDR>",
 //      	    "port": ###,
 //      	}
@@ -29,11 +29,16 @@ type nerveConfigData struct {
 	Services map[string]map[string]interface{}
 }
 
+type NerveService struct {
+	Name      string
+	Namespace string
+}
+
 // ParseNerveConfig is responsible for taking the JSON string coming in into a map of service:port
 // it will also filter based on only services runnign on this host.
 // To deal with multi-tenancy we actually will return port:service
-func ParseNerveConfig(raw *[]byte) (map[int]string, error) {
-	results := make(map[int]string)
+func ParseNerveConfig(raw *[]byte) (map[int]NerveService, error) {
+	results := make(map[int]NerveService)
 	ips, err := ipGetter()
 
 	if err != nil {
@@ -57,10 +62,12 @@ func ParseNerveConfig(raw *[]byte) (map[int]string, error) {
 
 		_, exists := ipMap[host]
 		if exists {
-			name := strings.Split(rawServiceName, ".")[0]
+			service := new(NerveService)
+			service.Name = strings.Split(rawServiceName, ".")[0]
+			service.Namespace = strings.Split(rawServiceName, ".")[1]
 			port := config.GetAsInt(serviceConfig["port"], -1)
 			if port != -1 {
-				results[port] = name
+				results[port] = *service
 			}
 		}
 	}
