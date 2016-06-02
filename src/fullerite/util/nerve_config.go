@@ -29,6 +29,7 @@ type nerveConfigData struct {
 	Services map[string]map[string]interface{}
 }
 
+// NerveService is an exported struct containing services' info
 type NerveService struct {
 	Name      string
 	Namespace string
