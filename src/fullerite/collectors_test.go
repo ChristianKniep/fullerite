@@ -137,3 +137,35 @@ func TestReadFromCollector(t *testing.T) {
 	assert.Equal(t, uint64(1), collectorMetrics["Test"])
 	assert.Equal(t, uint64(2), collectorMetrics["Foobar"])
 }
+
+func TestCollectorPrefix(t *testing.T) {
+	logrus.SetLevel(logrus.ErrorLevel)
+	c := make(map[string]interface{})
+	c["interval"] = 1
+	c["prefix"] = "px."
+	collector := collector.New("Test")
+	collector.SetInterval(1)
+	collector.Configure(c)
+
+	collectorChannel := map[string]chan metric.Metric{
+		"Test": make(chan metric.Metric),
+	}
+
+	testHandler := handler.New("Log")
+	testHandler.SetCollectorChannels(collectorChannel)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		collector.Channel() <- metric.New("hello")
+		close(collector.Channel())
+	}()
+	go func() {
+		defer wg.Done()
+		testMetric := <-collectorChannel["Test"]
+		assert.Equal(t, "px.hello", testMetric.Name)
+	}()
+	readFromCollector(collector, []handler.Handler{testHandler})
+	wg.Wait()
+}

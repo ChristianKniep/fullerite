@@ -30,6 +30,8 @@ type Collector interface {
 	SetCollectorType(string)
 	CanonicalName() string
 	SetCanonicalName(string)
+	Prefix() string
+	SetPrefix(string)
 }
 
 var collectorConstructs map[string]func(chan metric.Metric, int, *l.Entry) Collector
@@ -74,6 +76,7 @@ type baseCollector struct {
 	interval      int
 	collectorType string
 	canonicalName string
+	prefix        string
 
 	// intentionally exported
 	log *l.Entry
@@ -83,11 +86,22 @@ func (col *baseCollector) configureCommonParams(configMap map[string]interface{}
 	if interval, exists := configMap["interval"]; exists {
 		col.interval = config.GetAsInt(interval, DefaultCollectionInterval)
 	}
+
+	if prefix, exists := configMap["prefix"]; exists {
+		if str, ok := prefix.(string); ok {
+			col.prefix = str
+		}
+	}
 }
 
 // SetInterval : set the interval to collect on
 func (col *baseCollector) SetInterval(interval int) {
 	col.interval = interval
+}
+
+// SetPrefix : set the optional prefix for the collector
+func (col *baseCollector) SetPrefix(prefix string) {
+	col.prefix = prefix
 }
 
 // SetCollectorType : collector type
@@ -108,6 +122,11 @@ func (col *baseCollector) CanonicalName() string {
 // CollectorType : collector type
 func (col *baseCollector) CollectorType() string {
 	return col.collectorType
+}
+
+// Prefix : return optional prefix for all metrics from this collector
+func (col *baseCollector) Prefix() string {
+	return col.prefix
 }
 
 // Channel : the channel on which the collector should send metrics
