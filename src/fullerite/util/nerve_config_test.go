@@ -69,9 +69,9 @@ func getTestNerveConfig() []byte {
 }
 
 func TestNerveConfigParsing(t *testing.T) {
-	expected := map[int]string{
-		22222: "example_service",
-		13752: "example_service",
+	expected := map[int]NerveService{
+		22222: NerveService{Name: "example_service", Namespace: "mesosstage_main"},
+		13752: NerveService{Name: "example_service", Namespace: "main"},
 	}
 
 	cfgString := getTestNerveConfig()
