@@ -120,8 +120,8 @@ func (n *nerveUWSGICollector) Collect() {
 	}
 	n.log.Debug("Finished parsing Nerve config into ", servicePortMap)
 
-	for port, serviceName := range servicePortMap {
-		go n.queryService(serviceName, port)
+	for port, service := range servicePortMap {
+		go n.queryService(service.Name, port)
 	}
 }
 
