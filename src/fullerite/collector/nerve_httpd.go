@@ -125,26 +125,26 @@ func (c *NerveHTTPD) Collect() {
 	}
 	c.log.Debug("Finished parsing Nerve config into ", servicePortMap)
 
-	for port, serviceName := range servicePortMap {
-		if len(c.servicesWhitelist) == 0 || c.serviceInWhitelist(serviceName) {
-			if !c.checkIfFailed(serviceName, port) {
-				go c.emitHTTPDMetric(serviceName, port)
+	for port, service := range servicePortMap {
+		if len(c.servicesWhitelist) == 0 || c.serviceInWhitelist(service) {
+			if !c.checkIfFailed(service.Name, port) {
+				go c.emitHTTPDMetric(service, port)
 			}
 		}
 	}
 }
 
-func (c *NerveHTTPD) serviceInWhitelist(service string) bool {
+func (c *NerveHTTPD) serviceInWhitelist(service util.NerveService) bool {
 	for _, s := range c.servicesWhitelist {
-		if s == service {
+		if s == service.Name+"."+service.Namespace {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *NerveHTTPD) emitHTTPDMetric(serviceName string, port int) {
-	metrics := getNerveHTTPDMetrics(c, serviceName, port)
+func (c *NerveHTTPD) emitHTTPDMetric(service util.NerveService, port int) {
+	metrics := getNerveHTTPDMetrics(c, service, port)
 	for _, metric := range metrics {
 		c.Channel() <- metric
 	}
@@ -163,9 +163,9 @@ func (c *NerveHTTPD) checkIfFailed(serviceName string, port int) bool {
 	return false
 }
 
-func (c *NerveHTTPD) getMetrics(serviceName string, port int) []metric.Metric {
+func (c *NerveHTTPD) getMetrics(service util.NerveService, port int) []metric.Metric {
 	results := []metric.Metric{}
-	serviceLog := c.log.WithField("service", serviceName)
+	serviceLog := c.log.WithField("service", service.Name)
 
 	endpoint := fmt.Sprintf("http://%s:%d/%s", c.host, port, c.queryPath)
 	serviceLog.Debug("making GET request to ", endpoint)
@@ -173,14 +173,15 @@ func (c *NerveHTTPD) getMetrics(serviceName string, port int) []metric.Metric {
 	httpResponse := fetchApacheMetrics(endpoint, port)
 
 	if httpResponse.status != 200 {
-		c.updateFailedStatus(serviceName, port, httpResponse.status)
+		c.updateFailedStatus(service.Name, port, httpResponse.status)
 		serviceLog.Warn("Failed to query endpoint ", endpoint, ": ", httpResponse.err)
 		return results
 	}
 	apacheMetrics := extractApacheMetrics(httpResponse.data)
 	metric.AddToAll(&apacheMetrics, map[string]string{
-		"service": serviceName,
-		"port":    strconv.Itoa(port),
+		"service_name":      service.Name,
+		"service_namespace": service.Namespace,
+		"port":              strconv.Itoa(port),
 	})
 	return apacheMetrics
 }
