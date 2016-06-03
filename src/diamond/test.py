@@ -306,15 +306,15 @@ if __name__ == "__main__":
     cPath = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                          'collectors',
                                          options.collector))
-    dPath = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                         'tests',))
+    dPath = os.path.abspath(os.path.join(os.path.dirname(__file__), 'tests',))
+    currentPath = os.path.abspath(os.path.dirname(__file__))
+
     if options.diamond_only:
         getCollectorTests(dPath)
     else:
         getCollectorTests(cPath)
 
-    blacklistedTest = getBlacklistedTests(os.path.dirname(__file__))
-    print blacklistedTest
+    blacklistedTest = getBlacklistedTests(currentPath)
 
     loader = unittest.TestLoader()
     tests = []
