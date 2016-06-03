@@ -301,6 +301,11 @@ class Collector(object):
         """
         Publish a metric with the given name
         """
+        dimensions = None
+        if self.dimensions is not None:
+            dimensions = self.dimensions
+            self.dimensions = None
+
         # Check whitelist/blacklist
         if self.config['metrics_whitelist']:
             if not self.config['metrics_whitelist'].match(name):
@@ -315,11 +320,6 @@ class Collector(object):
         # Get metric TTL
         ttl = float(self.config['interval']) * float(
             self.config['ttl_multiplier'])
-
-        dimensions = None
-        if self.dimensions is not None:
-            dimensions = self.dimensions
-            self.dimensions = None
 
         # Create Metric
         try:
