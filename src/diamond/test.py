@@ -233,6 +233,15 @@ class CollectorTestCase(unittest.TestCase):
 collectorTests = {}
 
 
+def getBlacklistedTests(path):
+    blacklistedTests = {}
+    with open(os.path.join(path, "blacklist_test.txt")) as f:
+        file_lines = f.readlines()
+        for line in file_lines:
+            blacklistedTests[line.strip()] = True
+    return blacklistedTests
+
+
 def getCollectorTests(path):
     for f in os.listdir(path):
         cPath = os.path.abspath(os.path.join(path, f))
@@ -304,12 +313,17 @@ if __name__ == "__main__":
     else:
         getCollectorTests(cPath)
 
+    blacklistedTest = getBlacklistedTests(os.path.dirname(__file__))
+    print blacklistedTest
+
     loader = unittest.TestLoader()
     tests = []
     for test in collectorTests:
         for name, c in inspect.getmembers(collectorTests[test],
                                           inspect.isclass):
             if not issubclass(c, unittest.TestCase):
+                continue
+            if name in blacklistedTest:
                 continue
             tests.append(loader.loadTestsFromTestCase(c))
     suite = unittest.TestSuite(tests)
