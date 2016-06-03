@@ -51,3 +51,4 @@ TestEximCollector
 PortStatCollectorTestCase
 GetPortStatsTestCase
 TestDseOpsCenterCollector
+TestNagiosStatsCollector
