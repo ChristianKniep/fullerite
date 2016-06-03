@@ -8,6 +8,8 @@ from test import unittest
 import configobj
 import logging
 
+import re
+
 from diamond.collector import Collector
 from diamond.error import DiamondException
 
@@ -121,3 +123,32 @@ class BaseCollectorTest(unittest.TestCase):
             'max_buffer_size':300,
             'path_prefix':'servers'
     })
+
+    @patch('diamond.collector.Collector.publish_metric', autoSpec=True)
+    def test_blacklist_metrics(self, mock_publish):
+        c = Collector(self.config_object(), [])
+        c.config['metrics_blacklist'] = re.compile('metric1')
+        dimensions = {
+            'dim1': 'val1',
+            'dim2': 'val2',
+        }
+        c.dimensions = dimensions
+        c.publish('metric1', 1)
+
+        assert not mock_publish.called
+        self.assertEqual(c.dimensions, None)
+
+        dimensions = {
+            'dim3': 'val3',
+            'dim4': 'val4',
+        }
+        c.dimensions = dimensions
+        c.publish('metric2', 2)
+
+        assert mock_publish.called
+
+        for call in mock_publish.mock_calls:
+            name, args, kwargs = call
+            metric = args[0]
+            self.assertEquals(metric.dimensions, dimensions)
+        self.assertEqual(c.dimensions, None)
