@@ -100,7 +100,7 @@ is enabled:
 ```
 
 You also need to define a configuration file for this collector even if its contents are just `{}`.
-If you have are running from Fullerite clone. `examples/config` director should already contain `CPUCollector.conf`
+If you are running from Fullerite clone - `examples/config` director should already contain `CPUCollector.conf`
 file with `{}` as its contents.
 
 After that you can start fullerite as documented above.
@@ -128,7 +128,7 @@ You can run test of your individual collector via:
 ~> python src/diamond/test.py -c src/diamond/collectors/your_collector
 ```
 
-If you are modify a collector whose tests are blacklisted, it is a good idea to remove the name of the collector
+If you are modifying a collector whose tests are blacklisted, it is a good idea to remove the name of the collector
 test suite from blacklist file and make sure all its test pass before opening the pull request.
 
 Sometimes unit tests are not enough to test a collector and in such cases - it is a good idea to manually run
