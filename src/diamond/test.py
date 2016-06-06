@@ -314,7 +314,10 @@ if __name__ == "__main__":
     else:
         getCollectorTests(cPath)
 
-    blacklistedTest = getBlacklistedTests(currentPath)
+    if options.collector:
+        blacklistedTest = {}
+    else:
+        blacklistedTest = getBlacklistedTests(currentPath)
 
     loader = unittest.TestLoader()
     tests = []
