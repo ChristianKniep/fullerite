@@ -19,7 +19,7 @@ However - typically fullerite also requires some configuration before it can
 run properly. You can look into example configuration file in `examples/config/fullerite.conf.example`
 and adjust it according to your needs.
 
-A more shorter configuration is:
+A more simpler configuration is:
 
 ```
 {
@@ -44,10 +44,10 @@ A more shorter configuration is:
 }
 ```
 
-The most important bits here is `collectors` and `diamondCollectors` keys. We will talk about them
+The most important bits here are `collectors` and `diamondCollectors` keys. We will talk about them
 later in this document.
 
-Once you have created the configuration file - lets save it in root of fullerite directory with the name `fullerite.conf`.
+Once you have created the configuration file - let's save it in root of fullerite directory with the name `fullerite.conf`.
 
 Now you can start fullerite with following command:
 
@@ -90,7 +90,7 @@ And now you can go ahead and run fullerite as documented above.
 ### Adding a collector in Python
 
 If you are already familiar with Python - it is very easy to write a collector in Python.
-For this example - lets try to run CPU collector located at `diamond/collectors/cpu/cpu.py`.
+For this example - let's try to run CPU collector located at `diamond/collectors/cpu/cpu.py`.
 
 First you need to modify `fullerite.conf` file created above and make sure that this collector
 is enabled:
@@ -100,7 +100,7 @@ is enabled:
 ```
 
 You also need to define a configuration file for this collector even if its contents are just `{}`.
-If you are running from Fullerite clone - `examples/config` director should already contain `CPUCollector.conf`
+If you are running from Fullerite clone - `examples/config` directory should already contain `CPUCollector.conf`
 file with `{}` as its contents.
 
 After that you can start fullerite as documented above.
