@@ -105,5 +105,29 @@ func TestSignalFxDimensionsOverwriting(t *testing.T) {
 
 	dimensions := datapoint.GetDimensions()
 	assert.Equal(t, 1, len(dimensions), "there should be only one dimension")
-	assert.Equal(t, "second value", dimensions[0].GetValue(), "the correct name must be second vale")
+	assert.Equal(t, "second_value", dimensions[0].GetValue(), "the correct name must be second value")
+}
+
+func TestSanitation(t *testing.T) {
+	s := getTestSignalfxHandler(12, 12, 12)
+
+	m1 := metric.New(" Test= .me$tric ")
+	m1.AddDimension("simple string", "simple string")
+	m1.AddDimension("dot.string", "dot.string")
+	m1.AddDimension("3.3", "3.3")
+	m1.AddDimension("slash/string", "slash/string")
+	m1.AddDimension("colon:string", "colon:string")
+	m1.AddDimension("equal=string", "equal=string")
+	datapoint1 := s.convertToProto(m1)
+
+	m2 := metric.New("Test-_.metric")
+	m2.AddDimension("simple_string", "simple_string")
+	m2.AddDimension("dot_string", "dot.string")
+	m2.AddDimension("3_3", "3.3")
+	m2.AddDimension("slash_string", "slash/string")
+	m2.AddDimension("colon-string", "colon-string")
+	m2.AddDimension("equal-string", "equal-string")
+	datapoint2 := s.convertToProto(m2)
+
+	assert.Equal(t, datapoint1.GetMetric(), datapoint2.GetMetric(), "the two metrics should be the same")
 }
