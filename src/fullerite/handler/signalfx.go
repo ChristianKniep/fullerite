@@ -79,7 +79,7 @@ func (s *SignalFx) Run() {
 
 func (s SignalFx) convertToProto(incomingMetric metric.Metric) *DataPoint {
 	// Create a new values for the Datapoint that requires pointers.
-	outname := s.Prefix() + util.StrSanitize(incomingMetric.Name)
+	outname := s.Prefix() + util.StrSanitize(incomingMetric.Name, true, nil)
 	value := incomingMetric.Value
 
 	now := time.Now().UnixNano() / int64(time.Millisecond)
@@ -107,8 +107,8 @@ func (s SignalFx) convertToProto(incomingMetric metric.Metric) *DataPoint {
 		// values. We need to create new string objects in the
 		// scope of this for loop not to repeatedly add the
 		// same key:value pairs to the the datapoint.
-		dimensionKey := util.StrSanitize(key)
-		dimensionValue := util.StrSanitize(value)
+		dimensionKey := util.StrSanitize(key, false, []rune{'-', '_'})
+		dimensionValue := util.StrSanitize(value, true, nil)
 		dim := Dimension{
 			Key:   &dimensionKey,
 			Value: &dimensionValue,
