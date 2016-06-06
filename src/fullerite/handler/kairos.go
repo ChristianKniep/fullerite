@@ -90,13 +90,13 @@ func (k *Kairos) Run() {
 
 func (k Kairos) convertToKairos(incomingMetric metric.Metric) (datapoint KairosMetric) {
 	km := new(KairosMetric)
-	km.Name = k.Prefix() + util.StrSanitize(incomingMetric.Name)
+	km.Name = k.Prefix() + util.StrSanitize(incomingMetric.Name, false, []rune{'.', '/', '-', '_'})
 	km.Value = incomingMetric.Value
 	km.MetricType = "double"
 	km.Timestamp = time.Now().Unix() * 1000 // Kairos require timestamps to be milliseconds
 	km.Tags = make(map[string]string)
 	for key, value := range incomingMetric.GetDimensions(k.DefaultDimensions()) {
-		km.Tags[util.StrSanitize(key)] = util.StrSanitize(value)
+		km.Tags[util.StrSanitize(key, false, []rune{'.', '/', '-', '_'})] = util.StrSanitize(value, false, []rune{'.', '/', '-', '_'})
 	}
 	return *km
 }
