@@ -53,3 +53,5 @@ GetPortStatsTestCase
 TestDseOpsCenterCollector
 TestNagiosStatsCollector
 TestSmartCollector
+TestElbCollector
+TestMySQLCollector
