@@ -121,6 +121,10 @@ func readFromCollector(collector collector.Collector,
 			}
 		}
 
+		if len(collector.Prefix()) > 0 {
+			m.Name = collector.Prefix() + m.Name
+		}
+
 		for i := range handlers {
 			if _, exists := handlers[i].CollectorChannels()[c]; exists {
 				handlers[i].CollectorChannels()[c] <- m

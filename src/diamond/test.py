@@ -233,6 +233,15 @@ class CollectorTestCase(unittest.TestCase):
 collectorTests = {}
 
 
+def getBlacklistedTests(path):
+    blacklistedTests = {}
+    with open(os.path.join(path, "blacklist_test.txt")) as f:
+        file_lines = f.readlines()
+        for line in file_lines:
+            blacklistedTests[line.strip()] = True
+    return blacklistedTests
+
+
 def getCollectorTests(path):
     for f in os.listdir(path):
         cPath = os.path.abspath(os.path.join(path, f))
@@ -297,12 +306,18 @@ if __name__ == "__main__":
     cPath = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                          'collectors',
                                          options.collector))
-    dPath = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                         'tests',))
+    dPath = os.path.abspath(os.path.join(os.path.dirname(__file__), 'tests',))
+    currentPath = os.path.abspath(os.path.dirname(__file__))
+
     if options.diamond_only:
         getCollectorTests(dPath)
     else:
         getCollectorTests(cPath)
+
+    if options.collector:
+        blacklistedTest = {}
+    else:
+        blacklistedTest = getBlacklistedTests(currentPath)
 
     loader = unittest.TestLoader()
     tests = []
@@ -310,6 +325,8 @@ if __name__ == "__main__":
         for name, c in inspect.getmembers(collectorTests[test],
                                           inspect.isclass):
             if not issubclass(c, unittest.TestCase):
+                continue
+            if name in blacklistedTest:
                 continue
             tests.append(loader.loadTestsFromTestCase(c))
     suite = unittest.TestSuite(tests)

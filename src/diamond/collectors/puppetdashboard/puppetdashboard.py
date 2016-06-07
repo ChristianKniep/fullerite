@@ -56,8 +56,8 @@ class PuppetDashboardCollector(diamond.collector.Collector):
                 regex = re.compile(
                     "<a href=\"/nodes/(?P<key>[\w.]+)\">(?P<count>[\d.]+)</a>")
                 r = regex.search(line)
-                results = r.groupdict()
-
-                self.publish(results['key'], results['count'])
+                if r:
+                    results = r.groupdict()
+                    self.publish(results['key'], results['count'])
             except Exception, e:
                 self.log.error('Couldnt parse the output: %s', e)

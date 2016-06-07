@@ -17,7 +17,7 @@ import (
 
 const (
 	name    = "beatit"
-	version = "0.4.12"
+	version = "0.4.18"
 	desc    = "Stress test fullerite handlers"
 )
 

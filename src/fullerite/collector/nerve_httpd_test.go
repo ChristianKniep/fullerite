@@ -45,14 +45,16 @@ func TestDefaultConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, time.Duration(1)*time.Hour, collector.statusTTL)
 	assert.Equal(t, "localhost", collector.host)
 	assert.Equal(t, "NerveHTTPD", collector.Name())
+	assert.Nil(t, collector.servicesWhitelist)
 }
 
 func TestCustomConfigNerveHTTPD(t *testing.T) {
 	collector := getNerveHTTPDCollector()
 	configMap := map[string]interface{}{
-		"status_ttl":     120,
-		"configFilePath": "/tmp/foobar",
-		"host":           "169.0.0.1",
+		"status_ttl":        120,
+		"configFilePath":    "/tmp/foobar",
+		"host":              "169.0.0.1",
+		"servicesWhitelist": []string{"serv1.ns1", "serv2.ns2"},
 	}
 	collector.Configure(configMap)
 
@@ -61,6 +63,7 @@ func TestCustomConfigNerveHTTPD(t *testing.T) {
 	assert.Equal(t, "server-status?auto", collector.queryPath)
 	assert.Equal(t, time.Duration(120)*time.Second, collector.statusTTL)
 	assert.Equal(t, "169.0.0.1", collector.host)
+	assert.Equal(t, []string{"serv1.ns1", "serv2.ns2"}, collector.servicesWhitelist)
 }
 
 func TestExtractApacheMetrics(t *testing.T) {
@@ -106,7 +109,6 @@ func TestNerveHTTPDCollect(t *testing.T) {
 	}))
 	defer server.Close()
 	ip, port := parseURL(server.URL)
-
 	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
 	minimalNerveConfig["services"] = map[string]map[string]interface{}{
 		"test_service.things.and.stuff": {
@@ -150,5 +152,74 @@ func TestNerveHTTPDCollect(t *testing.T) {
 	assert.Equal(t, 1626.35, metricMap["BytesPerSec"].Value)
 
 	assert.Equal(t, port, metricMap["TotalAccesses"].Dimensions["port"])
-	assert.Equal(t, "test_service", metricMap["TotalAccesses"].Dimensions["service"])
+	assert.Equal(t, "test_service", metricMap["TotalAccesses"].Dimensions["service_name"])
+	assert.Equal(t, "things", metricMap["TotalAccesses"].Dimensions["service_namespace"])
+}
+
+func TestNerveHTTPDCollectWithWhiteList(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
+		fmt.Fprint(w, string(getRawApacheStat()))
+	}))
+	defer server.Close()
+	ip, port := parseURL(server.URL)
+
+	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
+		fmt.Fprint(w, string(getRawApacheStat()))
+	}))
+	defer server2.Close()
+	ip2, port2 := parseURL(server2.URL)
+
+	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
+	minimalNerveConfig["services"] = map[string]map[string]interface{}{
+		"test_service.namespace1.and.stuff": {
+			"host": ip,
+			"port": port,
+		},
+		"test_service.namespace2.and.stuff": {
+			"host": ip2,
+			"port": port2,
+		},
+	}
+
+	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
+	defer os.Remove(tmpFile.Name())
+	assert.Nil(t, err)
+
+	marshalled, err := json.Marshal(minimalNerveConfig)
+	assert.Nil(t, err)
+
+	_, err = tmpFile.Write(marshalled)
+	assert.Nil(t, err)
+
+	cfg := map[string]interface{}{
+		"configFilePath":    tmpFile.Name(),
+		"queryPath":         "",
+		"servicesWhitelist": []string{"test_service.namespace2"},
+	}
+
+	inst := getNerveHTTPDCollector()
+	inst.Configure(cfg)
+
+	inst.Collect()
+	actual := []metric.Metric{}
+	flag := true
+	for flag == true {
+		select {
+		case metric := <-inst.Channel():
+			actual = append(actual, metric)
+		case <-time.After(2 * time.Second):
+			flag = false
+			break
+		}
+	}
+	assert.Equal(t, 17, len(actual))
+
+	metricMap := map[string]metric.Metric{}
+	for k, m := range actual {
+		fmt.Println("cane piccolo : ", k)
+		metricMap[m.Name] = m
+	}
+	assert.Equal(t, port2, metricMap["TotalAccesses"].Dimensions["port"])
+	assert.Equal(t, "test_service", metricMap["TotalAccesses"].Dimensions["service_name"])
+	assert.Equal(t, "namespace2", metricMap["TotalAccesses"].Dimensions["service_namespace"])
 }

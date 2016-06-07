@@ -44,6 +44,7 @@ class CPUCollector(diamond.collector.Collector):
             'percore':  'Collect metrics per cpu core or just total',
             'simple':   'only return aggregate CPU% metric',
             'normalize': 'for cpu totals, divide by the number of CPUs',
+            'enableAggregation': 'Sends cpu.user + cpu.nice and cpu.irq + cpu.softirq',
         })
         return config_help
 
@@ -55,9 +56,9 @@ class CPUCollector(diamond.collector.Collector):
         config.update({
             'path':     'cpu',
             'percore':  'True',
-            'xenfix':   None,
             'simple':   'False',
             'normalize': 'False',
+            'enableAggregation': 'False',
         })
         return config
 
@@ -113,7 +114,7 @@ class CPUCollector(diamond.collector.Collector):
                 cpu = elements[0]
 
                 if cpu == 'cpu':
-                   cpu = 'cpu.total'
+                    cpu = 'cpu.total'
                 elif not str_to_bool(self.config['percore']):
                     continue
 
@@ -140,6 +141,12 @@ class CPUCollector(diamond.collector.Collector):
                 if len(elements) >= 11:
                     results[cpu]['guest_nice'] = elements[10]
 
+                if results[cpu]['user'] is not None and results[cpu]['nice'] is not None:
+                    results[cpu]['user_mode'] = float(results[cpu]['user']) + float(results[cpu]['nice'])
+
+                if results[cpu]['irq'] is not None and results[cpu]['softirq'] is not None:
+                    results[cpu]['irq_softirq'] = float(results[cpu]['irq']) + float(results[cpu]['softirq'])
+
             # Close File
             file.close()
 
@@ -157,26 +164,12 @@ class CPUCollector(diamond.collector.Collector):
                     else:
                         metrics[metric_name] = long(stats[s])
 
-            # Check for a bug in xen where the idle time is doubled for guest
-            # See https://bugzilla.redhat.com/show_bug.cgi?id=624756
-            if self.config['xenfix'] is None or self.config['xenfix'] is True:
-                if os.path.isdir('/proc/xen'):
-                    total = 0
-                    for metric_name in metrics.keys():
-                        if 'cpu0.' in metric_name:
-                            total += int(metrics[metric_name])
-                    if total > 110:
-                        self.config['xenfix'] = True
-                        for mname in metrics.keys():
-                            if '.idle' in mname:
-                                metrics[mname] = float(metrics[mname]) / 2
-                    elif total > 0:
-                        self.config['xenfix'] = False
-                else:
-                    self.config['xenfix'] = False
-
             for metric_name in metrics.keys():
                 metric_value = metrics[metric_name]
+                if (str_to_bool(self.config['enableAggregation']) is False
+                    and ('user_mode' in metric_name
+                        or 'irq_softirq' in metric_name)):
+                    continue
                 if 'cpu.total' not in metric_name:
                     metric_name, stat = metric_name.split('.')
                     core = metric_name[3:]
@@ -225,12 +218,21 @@ class CPUCollector(diamond.collector.Collector):
                 self.publish_cumulative_counter(metric_name + '.idle',
                                              cpu_time[i].idle)
 
+                if (str_to_bool(self.config['enableAggregation'])):
+                    self.publish_cumulative_counter(metric_name + '.user_mode',
+                                                float(cpu_time[i].user) + float(cpu_time[i].nice))
+
             metric_name = 'cpu.total'
+            cpu_user = total_time.user / cpu_count
             self.publish_cumulative_counter(metric_name + '.user',
-                                         total_time.user / cpu_count)
+                                         cpu_user)
             if hasattr(total_time, 'nice'):
+                cpu_nice = total_time.nice / cpu_count
                 self.publish_cumulative_counter(metric_name + '.nice',
-                                             total_time.nice / cpu_count)
+                                             cpu_nice)
+                if (str_to_bool(self.config['enableAggregation'])):
+                    self.publish_cumulative_counter(metric_name + '.user_mode',
+                                                cpu_user + cpu_nice)
             self.publish_cumulative_counter(metric_name + '.system',
                                          total_time.system / cpu_count)
             self.publish_cumulative_counter(metric_name + '.idle',

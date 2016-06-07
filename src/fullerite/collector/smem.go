@@ -12,8 +12,8 @@ package collector
 import (
 	"fullerite/config"
 	"fullerite/metric"
+	"fullerite/util"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	l "github.com/Sirupsen/logrus"
@@ -134,21 +134,13 @@ func (s *SmemStats) parseSmemLines(out string) []smemStatLine {
 		parts := strings.Fields(line)
 		stats = append(stats, smemStatLine{
 			proc: parts[3],
-			pss:  strToFloat(parts[0]),
-			rss:  strToFloat(parts[1]),
-			vss:  strToFloat(parts[2]),
+			pss:  util.StrToFloat(parts[0]),
+			rss:  util.StrToFloat(parts[1]),
+			vss:  util.StrToFloat(parts[2]),
 		})
 	}
 
 	return stats
-}
-
-func strToFloat(val string) float64 {
-	if i, err := strconv.ParseFloat(val, 64); err == nil {
-		return i
-	}
-
-	return 0
 }
 
 func getWhitelistedMetrics(blacklist []string) []string {
