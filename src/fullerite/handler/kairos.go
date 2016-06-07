@@ -37,6 +37,8 @@ type KairosMetric struct {
 	Tags       map[string]string `json:"tags"`
 }
 
+var allowedPuncts = []rune{'.', '/', '-', '_'}
+
 // newKairos returns a new Kairos handler
 func newKairos(
 	channel chan metric.Metric,
@@ -90,13 +92,13 @@ func (k *Kairos) Run() {
 
 func (k Kairos) convertToKairos(incomingMetric metric.Metric) (datapoint KairosMetric) {
 	km := new(KairosMetric)
-	km.Name = k.Prefix() + util.StrSanitize(incomingMetric.Name, false, []rune{'.', '/', '-', '_'})
+	km.Name = k.Prefix() + util.StrSanitize(incomingMetric.Name, false, allowedPuncts)
 	km.Value = incomingMetric.Value
 	km.MetricType = "double"
 	km.Timestamp = time.Now().Unix() * 1000 // Kairos require timestamps to be milliseconds
 	km.Tags = make(map[string]string)
 	for key, value := range incomingMetric.GetDimensions(k.DefaultDimensions()) {
-		km.Tags[util.StrSanitize(key, false, []rune{'.', '/', '-', '_'})] = util.StrSanitize(value, false, []rune{'.', '/', '-', '_'})
+		km.Tags[util.StrSanitize(key, false, allowedPuncts)] = util.StrSanitize(value, false, allowedPuncts)
 	}
 	return *km
 }

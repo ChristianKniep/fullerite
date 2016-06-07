@@ -32,12 +32,9 @@ func StrSanitize(s string, allowPunctuation bool, allowedPunctuation []rune) str
 			}
 			return r
 		}
-		return '='
+		return rune(-1)
 	}
 	s = strings.Map(translate, s)
-
-	// Delete all the undesidered chars
-	s = strings.Replace(s, "=", "", -1)
 
 	// Remove potential space
 	s = strings.TrimSpace(s)
