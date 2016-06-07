@@ -7,6 +7,7 @@ import (
 
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"regexp"
@@ -128,8 +129,8 @@ func (n *nerveUWSGICollector) Collect() {
 	}
 	n.log.Debug("Finished parsing Nerve config into ", servicePortMap)
 
-	for port, serviceName := range servicePortMap {
-		go n.queryService(serviceName, port)
+	for port, service := range servicePortMap {
+		go n.queryService(service.Name, port)
 	}
 }
 
@@ -167,7 +168,20 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 	}
 
 	rsp, err := client.Get(endpoint)
+
+	if rsp != nil {
+		defer func() {
+			io.Copy(ioutil.Discard, rsp.Body)
+			rsp.Body.Close()
+		}()
+	}
+
 	if err != nil {
+		return []byte{}, "", err
+	}
+
+	if rsp != nil && rsp.StatusCode != 200 {
+		err := fmt.Errorf("%s returned %d error code", endpoint, rsp.StatusCode)
 		return []byte{}, "", err
 	}
 
@@ -177,7 +191,6 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 	}
 
 	txt, err := ioutil.ReadAll(rsp.Body)
-	defer rsp.Body.Close()
 	if err != nil {
 		return []byte{}, "", err
 	}
