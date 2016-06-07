@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fullerite/config"
 	"fullerite/metric"
 	"fullerite/util"
 
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -70,19 +72,17 @@ type nestedMetricMap struct {
 	metricMap      map[string]interface{}
 }
 
-// Parser map for schema matching
-var (
-	schemaMap                map[string]func(*[]byte) ([]metric.Metric, error)
-	enableCumulativeCounters bool
-)
+type nerveUWSGICollector struct {
+	baseCollector
+
+	configFilePath    string
+	queryPath         string
+	timeout           int
+	servicesWhitelist []string
+}
 
 func init() {
 	RegisterCollector("NerveUWSGI", newNerveUWSGI)
-	// Enumerate schema-parser map:
-	schemaMap = make(map[string]func(*[]byte) ([]metric.Metric, error))
-	schemaMap["uwsgi.1.0"] = parseUWSGIMetrics10
-	schemaMap["uwsgi.1.1"] = parseUWSGIMetrics11
-	schemaMap["default"] = parseDefault
 }
 
 func newNerveUWSGI(channel chan metric.Metric, initialInterval int, log *l.Entry) Collector {
@@ -100,12 +100,18 @@ func newNerveUWSGI(channel chan metric.Metric, initialInterval int, log *l.Entry
 	return col
 }
 
-type nerveUWSGICollector struct {
-	baseCollector
+func (n *nerveUWSGICollector) Configure(configMap map[string]interface{}) {
+	if val, exists := configMap["queryPath"]; exists {
+		n.queryPath = val.(string)
+	}
+	if val, exists := configMap["configFilePath"]; exists {
+		n.configFilePath = val.(string)
+	}
+	if val, exists := configMap["servicesWhitelistCCount"]; exists {
+		n.servicesWhitelist = config.GetAsSlice(val)
+	}
 
-	configFilePath string
-	queryPath      string
-	timeout        int
+	n.configureCommonParams(configMap)
 }
 
 func (n *nerveUWSGICollector) Collect() {
