@@ -15,6 +15,7 @@ func TestStrSanitize(t *testing.T) {
 		"non_ascii":                          "as\x81cii\x80",
 		"stripped_to_empty_string":           "\n  \t\n",
 		"non_ascii_stripped_to_empty_string": "\n\x81  \x80\t\n",
+		"non_ascii_and_whitespaces":          "☃\nthis\nword\n☃\n",
 	}
 
 	expected := map[string]string{
@@ -25,6 +26,7 @@ func TestStrSanitize(t *testing.T) {
 		"non_ascii":                          "ascii",
 		"stripped_to_empty_string":           "null",
 		"non_ascii_stripped_to_empty_string": "null",
+		"non_ascii_and_whitespaces":          "this_word",
 	}
 
 	for k := range words {

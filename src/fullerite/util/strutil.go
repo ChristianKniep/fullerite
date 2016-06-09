@@ -16,14 +16,11 @@ func StrToFloat(val string) float64 {
 
 // StrSanitize enables handler lever sanitation
 func StrSanitize(s string, allowPunctuation bool, allowedPunctuation []rune) string {
-	// all leading and trailing white space removed
-	s = strings.TrimSpace(s)
-
 	// this function used by strings.Map() where we change punctuation symbols NOT
 	// allowed with the char '_' and all the other undesired chars with '=' because
 	// the empty char cannot be used here; so these chars will be deleted later.
 	translate := func(r rune) rune {
-		if unicode.IsDigit(r) || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || unicode.IsSpace(r) {
+		if unicode.IsDigit(r) || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
 			return r
 		}
 		if unicode.IsPunct(r) {
@@ -32,11 +29,14 @@ func StrSanitize(s string, allowPunctuation bool, allowedPunctuation []rune) str
 			}
 			return r
 		}
+		if unicode.IsSpace(r) {
+			return ' '
+		}
 		return rune(-1)
 	}
 	s = strings.Map(translate, s)
 
-	// Remove potential space
+	// All leading and trailing white space removed
 	s = strings.TrimSpace(s)
 
 	// Change all spaces with the char '_'
