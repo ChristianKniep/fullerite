@@ -186,7 +186,7 @@ func TestSanitizeMetricDimensionValue(t *testing.T) {
 }
 
 func TestSanitationMetrics(t *testing.T) {
-	s := getTestSignalfxHandler(12, 12, 12)
+	s := getTestKairosHandler(12, 13, 14)
 
 	m1 := metric.New(" Test= .me$tric ")
 	m1.AddDimension("simple string", "simple string")
@@ -195,7 +195,7 @@ func TestSanitationMetrics(t *testing.T) {
 	m1.AddDimension("slash/string", "slash/string")
 	m1.AddDimension("colon:string", "colon:string")
 	m1.AddDimension("equal=string", "equal=string")
-	datapoint1 := s.convertToProto(m1)
+	datapoint1 := s.convertToKairos(m1)
 
 	m2 := metric.New("Test-_.metric")
 	m2.AddDimension("simple_string", "simple_string")
@@ -204,7 +204,7 @@ func TestSanitationMetrics(t *testing.T) {
 	m2.AddDimension("slash/string", "slash/string")
 	m2.AddDimension("colon-string", "colon-string")
 	m2.AddDimension("equal-string", "equal-string")
-	datapoint2 := s.convertToProto(m2)
+	datapoint2 := s.convertToKairos(m2)
 
-	assert.Equal(t, datapoint1.GetMetric(), datapoint2.GetMetric(), "the two metrics should be the same")
+	assert.Equal(t, datapoint1, datapoint2, "the two metrics should be the same")
 }
