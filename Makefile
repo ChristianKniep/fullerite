@@ -1,6 +1,6 @@
 FULLERITE      := fullerite
 BEATIT         := beatit
-VERSION        := 0.4.13
+VERSION        := 0.4.18
 SRCDIR         := src
 HANDLER_DIR    := $(SRCDIR)/fullerite/handler
 PROTO_SFX      := $(HANDLER_DIR)/signalfx.proto
@@ -59,7 +59,7 @@ $(BEATIT): $(BEATIT_SOURCES)
 	@gom build -o bin/$(BEATIT) $@
 
 test: tests
-tests: deps diamond_core_test
+tests: deps diamond_core_test diamond_collector_test
 	@echo Testing $(FULLERITE)
 	@for pkg in $(PKGS); do \
 		gom test -cover $$pkg || exit 1;\
@@ -73,6 +73,9 @@ qbt:
 
 diamond_core_test:
 	@python src/diamond/test.py -d
+
+diamond_collector_test:
+	@python src/diamond/test.py
 
 coverage_report: deps
 	@echo Creating a coverage rport for $(FULLERITE)
