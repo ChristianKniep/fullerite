@@ -108,7 +108,7 @@ func (n *nerveUWSGICollector) Configure(configMap map[string]interface{}) {
 	if val, exists := configMap["configFilePath"]; exists {
 		n.configFilePath = val.(string)
 	}
-	if val, exists := configMap["whitelist"]; exists {
+	if val, exists := configMap["servicesWhitelist"]; exists {
 		n.servicesWhitelist = config.GetAsSlice(val)
 	}
 
