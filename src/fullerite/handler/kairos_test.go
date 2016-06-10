@@ -208,3 +208,14 @@ func TestSanitationMetrics(t *testing.T) {
 
 	assert.Equal(t, datapoint1, datapoint2, "the two metrics should be the same")
 }
+
+func TestKairosDimensionsOverwriting(t *testing.T) {
+	s := getTestKairosHandler(12, 12, 12)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "first value")
+	m1.AddDimension("some-dim", "second value")
+	datapoint := s.convertToKairos(m1)
+
+	assert.Equal(t, len(datapoint.Tags), 1, "the two metrics should be the same")
+}

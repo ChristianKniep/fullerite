@@ -105,10 +105,9 @@ func TestSignalFxDimensionsOverwriting(t *testing.T) {
 
 	dimensions := datapoint.GetDimensions()
 	assert.Equal(t, 1, len(dimensions), "there should be only one dimension")
-	assert.Equal(t, "second_value", dimensions[0].GetValue(), "the correct name must be second value")
 }
 
-func TestSanitation(t *testing.T) {
+func TestSignalFxSanitation(t *testing.T) {
 	s := getTestSignalfxHandler(12, 12, 12)
 
 	m1 := metric.New(" Test= .me$tric ")

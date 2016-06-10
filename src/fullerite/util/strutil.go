@@ -20,6 +20,9 @@ func StrSanitize(s string, allowPunctuation bool, allowedPunctuation []rune) str
 	// allowed with the char '_' and all the other undesired chars with '=' because
 	// the empty char cannot be used here; so these chars will be deleted later.
 	translate := func(r rune) rune {
+		if r == ':' || r == '=' {
+			return '-'
+		}
 		if unicode.IsDigit(r) || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
 			return r
 		}

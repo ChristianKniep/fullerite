@@ -104,6 +104,19 @@ func (s SignalFx) convertToProto(incomingMetric metric.Metric) *DataPoint {
 		datapoint.MetricType = MetricType_CUMULATIVE_COUNTER.Enum()
 	}
 
+	for key, value := range s.getSanitizedDimensions(incomingMetric) {
+		dim := Dimension{
+			Key:   &key,
+			Value: &value,
+		}
+		datapoint.Dimensions = append(datapoint.Dimensions, &dim)
+	}
+
+	return datapoint
+}
+
+func (s SignalFx) getSanitizedDimensions(incomingMetric metric.Metric) map[string]string {
+	dimSanitized := make(map[string]string)
 	dimensions := incomingMetric.GetDimensions(s.DefaultDimensions())
 	for key, value := range dimensions {
 		// Dimension (protobuf) require a pointer to string
@@ -112,14 +125,9 @@ func (s SignalFx) convertToProto(incomingMetric metric.Metric) *DataPoint {
 		// same key:value pairs to the the datapoint.
 		dimensionKey := signalFxKeySanitize(key)
 		dimensionValue := signalFxValueSanitize(value)
-		dim := Dimension{
-			Key:   &dimensionKey,
-			Value: &dimensionValue,
-		}
-		datapoint.Dimensions = append(datapoint.Dimensions, &dim)
+		dimSanitized[dimensionKey] = dimensionValue
 	}
-
-	return datapoint
+	return dimSanitized
 }
 
 func (s *SignalFx) emitMetrics(metrics []metric.Metric) bool {

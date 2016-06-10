@@ -1,7 +1,5 @@
 package metric
 
-import "strings"
-
 // The different types of metrics that are supported
 const (
 	Gauge             = "gauge"
@@ -22,7 +20,7 @@ type Metric struct {
 // and timestamp is set to now. Value is initialized to 0.0.
 func New(name string) Metric {
 	return Metric{
-		Name:       sanitizeString(name),
+		Name:       name,
 		MetricType: "gauge",
 		Value:      0.0,
 		Dimensions: make(map[string]string),
@@ -38,7 +36,7 @@ func WithValue(name string, value float64) Metric {
 
 // AddDimension adds a new dimension to the Metric.
 func (m *Metric) AddDimension(name, value string) {
-	m.Dimensions[sanitizeString(name)] = sanitizeString(value)
+	m.Dimensions[name] = value
 }
 
 // RemoveDimension removes a dimension from the Metric.
@@ -67,7 +65,6 @@ func (m *Metric) GetDimensions(defaults map[string]string) (dimensions map[strin
 
 // GetDimensionValue returns the value of a dimension if it's set.
 func (m *Metric) GetDimensionValue(dimension string) (value string, ok bool) {
-	dimension = sanitizeString(dimension)
 	value, ok = m.Dimensions[dimension]
 	return
 }
@@ -87,10 +84,4 @@ func AddToAll(metrics *[]Metric, dims map[string]string) {
 			m.AddDimension(key, value)
 		}
 	}
-}
-
-func sanitizeString(s string) string {
-	s = strings.Replace(s, "=", "-", -1)
-	s = strings.Replace(s, ":", "-", -1)
-	return s
 }
