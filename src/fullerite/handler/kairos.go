@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fullerite/metric"
+	"fullerite/util"
 
 	"bytes"
 	"encoding/json"
@@ -35,6 +36,8 @@ type KairosMetric struct {
 	Value      float64           `json:"value"`
 	Tags       map[string]string `json:"tags"`
 }
+
+var allowedPuncts = []rune{'.', '/', '-', '_'}
 
 // newKairos returns a new Kairos handler
 func newKairos(
@@ -89,11 +92,14 @@ func (k *Kairos) Run() {
 
 func (k Kairos) convertToKairos(incomingMetric metric.Metric) (datapoint KairosMetric) {
 	km := new(KairosMetric)
-	km.Name = k.Prefix() + incomingMetric.Name
+	km.Name = k.Prefix() + kairosSanitize(incomingMetric.Name)
 	km.Value = incomingMetric.Value
 	km.MetricType = "double"
 	km.Timestamp = time.Now().Unix() * 1000 // Kairos require timestamps to be milliseconds
-	km.Tags = incomingMetric.GetDimensions(k.DefaultDimensions())
+	km.Tags = make(map[string]string)
+	for key, value := range incomingMetric.GetDimensions(k.DefaultDimensions()) {
+		km.Tags[kairosSanitize(key)] = kairosSanitize(value)
+	}
 	return *km
 }
 
@@ -187,4 +193,8 @@ func (k Kairos) parseServerError(errMsg string, metrics []KairosMetric) string {
 	}
 
 	return string(retData)
+}
+
+func kairosSanitize(value string) string {
+	return util.StrSanitize(value, false, allowedPuncts)
 }

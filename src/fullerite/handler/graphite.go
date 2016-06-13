@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"fullerite/metric"
+	"fullerite/util"
 	"net"
 	"sort"
 	"time"
@@ -20,6 +21,9 @@ type Graphite struct {
 	server string
 	port   string
 }
+
+// allowedPunctation: taken here https://github.com/dropwizard/metrics/issues/637
+var allowedPunctuation = []rune{'!', '#', '$', '%', '&', '"', '*', '+', '-', ';', '<', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '|', '~'}
 
 // newGraphite returns a new Graphite handler.
 func newGraphite(
@@ -75,18 +79,27 @@ func (g *Graphite) Run() {
 func (g Graphite) convertToGraphite(incomingMetric metric.Metric) (datapoint string) {
 	//orders dimensions so datapoint keeps consistent name
 	var keys []string
-	dimensions := incomingMetric.GetDimensions(g.DefaultDimensions())
+	dimensions := g.getSanitizedDimensions(incomingMetric)
 	for k := range dimensions {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
-	datapoint = g.Prefix() + incomingMetric.Name
+	datapoint = g.Prefix() + graphiteSanitize(incomingMetric.Name)
 	for _, key := range keys {
 		datapoint = fmt.Sprintf("%s.%s.%s", datapoint, key, dimensions[key])
 	}
 	datapoint = fmt.Sprintf("%s %f %d\n", datapoint, incomingMetric.Value, time.Now().Unix())
 	return datapoint
+}
+
+func (g Graphite) getSanitizedDimensions(incomingMetric metric.Metric) map[string]string {
+	dimSanitized := make(map[string]string)
+	dimensions := incomingMetric.GetDimensions(g.DefaultDimensions())
+	for key, value := range dimensions {
+		dimSanitized[graphiteSanitize(key)] = graphiteSanitize(value)
+	}
+	return dimSanitized
 }
 
 func (g *Graphite) emitMetrics(metrics []metric.Metric) bool {
@@ -108,4 +121,8 @@ func (g *Graphite) emitMetrics(metrics []metric.Metric) bool {
 		fmt.Fprintf(conn, g.convertToGraphite(m))
 	}
 	return true
+}
+
+func graphiteSanitize(value string) string {
+	return util.StrSanitize(value, false, allowedPunctuation)
 }

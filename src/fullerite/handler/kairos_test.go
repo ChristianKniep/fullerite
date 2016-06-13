@@ -142,3 +142,80 @@ func TestKairosServerErrorParse(t *testing.T) {
 
 	assert.Equal(t, k.parseServerError(string(errByt), series), string(expectByt))
 }
+
+func TestSanitizeMetricName(t *testing.T) {
+	k := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New("Test==:")
+	m1.AddDimension("somedim", "value")
+	s1 := k.convertToKairos(m1)
+
+	m2 := metric.New("Test---")
+	m2.AddDimension("somedim", "value")
+	s2 := k.convertToKairos(m2)
+
+	assert.Equal(t, s1, s2, "metric name should be sanitazed")
+}
+
+func TestSanitizeMetricDimensionName(t *testing.T) {
+	k := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "valu=")
+	s1 := k.convertToKairos(m1)
+
+	m2 := metric.New("Test")
+	m2.AddDimension("some-dim", "valu-")
+	s2 := k.convertToKairos(m2)
+
+	assert.Equal(t, s1, s2, "metric dimension should be sanitazed")
+}
+
+func TestSanitizeMetricDimensionValue(t *testing.T) {
+	k := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "valu=")
+	s1 := k.convertToKairos(m1)
+
+	m2 := metric.New("Test")
+	m2.AddDimension("some-dim", "valu-")
+	s2 := k.convertToKairos(m2)
+
+	assert.Equal(t, s1, s2, "metric dimension should be sanitazed")
+}
+
+func TestSanitationMetrics(t *testing.T) {
+	s := getTestKairosHandler(12, 13, 14)
+
+	m1 := metric.New(" Test= .me$tric ")
+	m1.AddDimension("simple string", "simple string")
+	m1.AddDimension("dot.string", "dot.string")
+	m1.AddDimension("3.3", "3.3")
+	m1.AddDimension("slash/string", "slash/string")
+	m1.AddDimension("colon:string", "colon:string")
+	m1.AddDimension("equal=string", "equal=string")
+	datapoint1 := s.convertToKairos(m1)
+
+	m2 := metric.New("Test-_.metric")
+	m2.AddDimension("simple_string", "simple_string")
+	m2.AddDimension("dot.string", "dot.string")
+	m2.AddDimension("3.3", "3.3")
+	m2.AddDimension("slash/string", "slash/string")
+	m2.AddDimension("colon-string", "colon-string")
+	m2.AddDimension("equal-string", "equal-string")
+	datapoint2 := s.convertToKairos(m2)
+
+	assert.Equal(t, datapoint1, datapoint2, "the two metrics should be the same")
+}
+
+func TestKairosDimensionsOverwriting(t *testing.T) {
+	s := getTestKairosHandler(12, 12, 12)
+
+	m1 := metric.New("Test")
+	m1.AddDimension("some=dim", "first value")
+	m1.AddDimension("some-dim", "second value")
+	datapoint := s.convertToKairos(m1)
+
+	assert.Equal(t, len(datapoint.Tags), 1, "the two metrics should be the same")
+}

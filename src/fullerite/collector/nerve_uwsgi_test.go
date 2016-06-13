@@ -454,7 +454,6 @@ func TestErrorQueryEndpointResponse(t *testing.T) {
 
 func TestNerveUWSGICollect(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
-		// fmt.Println("MARRRRP")
 		fmt.Fprint(w, getTestUWSGIResponse())
 	}))
 	defer server.Close()

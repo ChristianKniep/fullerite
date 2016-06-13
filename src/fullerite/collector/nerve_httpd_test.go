@@ -215,8 +215,7 @@ func TestNerveHTTPDCollectWithWhiteList(t *testing.T) {
 	assert.Equal(t, 17, len(actual))
 
 	metricMap := map[string]metric.Metric{}
-	for k, m := range actual {
-		fmt.Println("cane piccolo : ", k)
+	for _, m := range actual {
 		metricMap[m.Name] = m
 	}
 	assert.Equal(t, port2, metricMap["TotalAccesses"].Dimensions["port"])
