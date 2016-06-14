@@ -127,8 +127,9 @@ func TestNerveHTTPDCollect(t *testing.T) {
 	assert.Nil(t, err)
 
 	cfg := map[string]interface{}{
-		"configFilePath": tmpFile.Name(),
-		"queryPath":      "",
+		"configFilePath":    tmpFile.Name(),
+		"queryPath":         "",
+		"servicesWhitelist": []string{"test_service.things"},
 	}
 
 	inst := getNerveHTTPDCollector()
@@ -156,7 +157,7 @@ func TestNerveHTTPDCollect(t *testing.T) {
 	assert.Equal(t, "things", metricMap["TotalAccesses"].Dimensions["service_namespace"])
 }
 
-func TestNerveHTTPDCollectWithWhiteList(t *testing.T) {
+func TestNerveHTTPDCollectWhiteList(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
 		fmt.Fprint(w, string(getRawApacheStat()))
 	}))
@@ -221,4 +222,111 @@ func TestNerveHTTPDCollectWithWhiteList(t *testing.T) {
 	assert.Equal(t, port2, metricMap["TotalAccesses"].Dimensions["port"])
 	assert.Equal(t, "test_service", metricMap["TotalAccesses"].Dimensions["service_name"])
 	assert.Equal(t, "namespace2", metricMap["TotalAccesses"].Dimensions["service_namespace"])
+}
+
+func TestNerveHTTPDCollectWithEmptyWhiteList(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
+		fmt.Fprint(w, string(getRawApacheStat()))
+	}))
+	defer server.Close()
+	ip, port := parseURL(server.URL)
+
+	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
+	minimalNerveConfig["services"] = map[string]map[string]interface{}{
+		"test_service.namespace1.and.stuff": {
+			"host": ip,
+			"port": port,
+		},
+		"test_service.namespace2.and.stuff": {
+			"host": ip,
+			"port": port,
+		},
+	}
+
+	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
+	defer os.Remove(tmpFile.Name())
+	assert.Nil(t, err)
+
+	marshalled, err := json.Marshal(minimalNerveConfig)
+	assert.Nil(t, err)
+
+	_, err = tmpFile.Write(marshalled)
+	assert.Nil(t, err)
+
+	cfg := map[string]interface{}{
+		"configFilePath":    tmpFile.Name(),
+		"queryPath":         "",
+		"servicesWhitelist": []string{},
+	}
+
+	inst := getNerveHTTPDCollector()
+	inst.Configure(cfg)
+
+	inst.Collect()
+	actual := []metric.Metric{}
+	flag := true
+	for flag == true {
+		select {
+		case metric := <-inst.Channel():
+			actual = append(actual, metric)
+		case <-time.After(2 * time.Second):
+			flag = false
+			break
+		}
+	}
+
+	assert.Equal(t, 0, len(actual))
+}
+
+func TestNerveHTTPDCollectWhiteListNotConfigured(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
+		fmt.Fprint(w, string(getRawApacheStat()))
+	}))
+	defer server.Close()
+	ip, port := parseURL(server.URL)
+
+	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
+	minimalNerveConfig["services"] = map[string]map[string]interface{}{
+		"test_service.namespace1.and.stuff": {
+			"host": ip,
+			"port": port,
+		},
+		"test_service.namespace2.and.stuff": {
+			"host": ip,
+			"port": port,
+		},
+	}
+
+	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
+	defer os.Remove(tmpFile.Name())
+	assert.Nil(t, err)
+
+	marshalled, err := json.Marshal(minimalNerveConfig)
+	assert.Nil(t, err)
+
+	_, err = tmpFile.Write(marshalled)
+	assert.Nil(t, err)
+
+	cfg := map[string]interface{}{
+		"configFilePath": tmpFile.Name(),
+		"queryPath":      "",
+	}
+
+	inst := getNerveHTTPDCollector()
+	inst.Configure(cfg)
+
+	inst.Collect()
+	actual := []metric.Metric{}
+	flag := true
+	for flag == true {
+		select {
+		case metric := <-inst.Channel():
+			actual = append(actual, metric)
+		case <-time.After(2 * time.Second):
+			flag = false
+			break
+		}
+	}
+
+	assert.Equal(t, 0, len(actual))
 }
