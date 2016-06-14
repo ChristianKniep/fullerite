@@ -231,12 +231,6 @@ func TestNerveHTTPDCollectWithEmptyWhiteList(t *testing.T) {
 	defer server.Close()
 	ip, port := parseURL(server.URL)
 
-	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
-		fmt.Fprint(w, string(getRawApacheStat()))
-	}))
-	defer server2.Close()
-	ip2, port2 := parseURL(server2.URL)
-
 	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
 	minimalNerveConfig["services"] = map[string]map[string]interface{}{
 		"test_service.namespace1.and.stuff": {
@@ -244,8 +238,8 @@ func TestNerveHTTPDCollectWithEmptyWhiteList(t *testing.T) {
 			"port": port,
 		},
 		"test_service.namespace2.and.stuff": {
-			"host": ip2,
-			"port": port2,
+			"host": ip,
+			"port": port,
 		},
 	}
 
@@ -291,12 +285,6 @@ func TestNerveHTTPDCollectWhiteListNotConfigured(t *testing.T) {
 	defer server.Close()
 	ip, port := parseURL(server.URL)
 
-	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
-		fmt.Fprint(w, string(getRawApacheStat()))
-	}))
-	defer server2.Close()
-	ip2, port2 := parseURL(server2.URL)
-
 	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
 	minimalNerveConfig["services"] = map[string]map[string]interface{}{
 		"test_service.namespace1.and.stuff": {
@@ -304,8 +292,8 @@ func TestNerveHTTPDCollectWhiteListNotConfigured(t *testing.T) {
 			"port": port,
 		},
 		"test_service.namespace2.and.stuff": {
-			"host": ip2,
-			"port": port2,
+			"host": ip,
+			"port": port,
 		},
 	}
 
