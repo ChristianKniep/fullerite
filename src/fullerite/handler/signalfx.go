@@ -105,9 +105,15 @@ func (s SignalFx) convertToProto(incomingMetric metric.Metric) *DataPoint {
 	}
 
 	for key, value := range s.getSanitizedDimensions(incomingMetric) {
+		// Dimension (protobuf) require a pointer to string
+		// values. We need to create new string objects in the
+		// scope of this for loop not to repeatedly add the
+		// same key:value pairs to the the datapoint.
+		dimKey := key
+		dimValue := value
 		dim := Dimension{
-			Key:   &key,
-			Value: &value,
+			Key:   &dimKey,
+			Value: &dimValue,
 		}
 		datapoint.Dimensions = append(datapoint.Dimensions, &dim)
 	}
@@ -119,13 +125,7 @@ func (s SignalFx) getSanitizedDimensions(incomingMetric metric.Metric) map[strin
 	dimSanitized := make(map[string]string)
 	dimensions := incomingMetric.GetDimensions(s.DefaultDimensions())
 	for key, value := range dimensions {
-		// Dimension (protobuf) require a pointer to string
-		// values. We need to create new string objects in the
-		// scope of this for loop not to repeatedly add the
-		// same key:value pairs to the the datapoint.
-		dimensionKey := signalFxKeySanitize(key)
-		dimensionValue := signalFxValueSanitize(value)
-		dimSanitized[dimensionKey] = dimensionValue
+		dimSanitized[signalFxKeySanitize(key)] = signalFxValueSanitize(value)
 	}
 	return dimSanitized
 }
