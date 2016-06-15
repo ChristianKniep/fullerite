@@ -55,3 +55,9 @@ TestNagiosStatsCollector
 TestSmartCollector
 TestElbCollector
 TestMySQLCollector
+TestPgbouncerCollector
+TestSlonyCollector
+TestMongoDBCollector
+TestMongoMultiHostDBCollector
+TestTokuMXCollector
+TestPgbouncerCollector
