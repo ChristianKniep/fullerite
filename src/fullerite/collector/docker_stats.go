@@ -183,6 +183,8 @@ func (d DockerStats) buildMetrics(container *docker.Container, containerStats *d
 		buildDockerMetric("DockerMemoryUsed", metric.Gauge, float64(containerStats.MemoryStats.Usage)),
 		buildDockerMetric("DockerMemoryLimit", metric.Gauge, float64(containerStats.MemoryStats.Limit)),
 		buildDockerMetric("DockerCpuPercentage", metric.Gauge, cpuPercentage),
+		buildDockerMetric("DockerCpuThrottledPeriods", metric.CumulativeCounter, float64(containerStats.CPUStats.ThrottlingData.ThrottledPeriods)),
+		buildDockerMetric("DockerCpuThrottledNanoseconds", metric.CumulativeCounter, float64(containerStats.CPUStats.ThrottlingData.ThrottledTime)),
 	}
 	for netiface := range containerStats.Networks {
 		// legacy format

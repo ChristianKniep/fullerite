@@ -76,6 +76,8 @@ func TestDockerStatsBuildMetrics(t *testing.T) {
 	stats.Networks["eth0"] = docker.NetworkStats{RxBytes: 10, TxBytes: 20}
 	stats.MemoryStats.Usage = 50
 	stats.MemoryStats.Limit = 70
+	stats.CPUStats.ThrottlingData.ThrottledPeriods = 123
+	stats.CPUStats.ThrottlingData.ThrottledTime = 456
 
 	containerJSON := []byte(`
 	{
@@ -113,6 +115,8 @@ func TestDockerStatsBuildMetrics(t *testing.T) {
 		metric.Metric{"DockerMemoryUsed", "gauge", 50, baseDims},
 		metric.Metric{"DockerMemoryLimit", "gauge", 70, baseDims},
 		metric.Metric{"DockerCpuPercentage", "gauge", 0.5, baseDims},
+		metric.Metric{"DockerCpuThrottledPeriods", "cumcounter", 123, baseDims},
+		metric.Metric{"DockerCpuThrottledNanoseconds", "cumcounter", 456, baseDims},
 		metric.Metric{"DockerTxBytes", "cumcounter", 20, netDims},
 		metric.Metric{"DockerRxBytes", "cumcounter", 10, netDims},
 		metric.Metric{"DockerContainerCount", "counter", 1, expectedDimsGen},
@@ -141,6 +145,8 @@ func TestDockerStatsBuildMetricsWithNameAsEnvVariable(t *testing.T) {
 	stats := new(docker.Stats)
 	stats.MemoryStats.Usage = 50
 	stats.MemoryStats.Limit = 70
+	stats.CPUStats.ThrottlingData.ThrottledPeriods = 123
+	stats.CPUStats.ThrottlingData.ThrottledTime = 456
 
 	containerJSON := []byte(`
 	{
@@ -168,6 +174,8 @@ func TestDockerStatsBuildMetricsWithNameAsEnvVariable(t *testing.T) {
 		metric.Metric{"DockerMemoryUsed", "gauge", 50, expectedDims},
 		metric.Metric{"DockerMemoryLimit", "gauge", 70, expectedDims},
 		metric.Metric{"DockerCpuPercentage", "gauge", 0.5, expectedDims},
+		metric.Metric{"DockerCpuThrottledPeriods", "cumcounter", 123, expectedDims},
+		metric.Metric{"DockerCpuThrottledNanoseconds", "cumcounter", 456, expectedDims},
 		metric.Metric{"DockerContainerCount", "counter", 1, expectedDimsGen},
 	}
 
