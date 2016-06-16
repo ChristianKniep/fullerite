@@ -49,7 +49,7 @@ func getTestNerveConfig() []byte {
 	                    "rise": 1,
 	                    "timeout": 6,
 	                    "type": "http",
-	                    "uri": "/http/example_service.mesosstage_main/13752/status"
+	                    "uri": "/http/example_service.mesosstage_main/22224/status"
 	                }
 	            ],
 	            "host": "10.56.5.21",
@@ -70,7 +70,7 @@ func getTestNerveConfig() []byte {
 
 func TestNerveConfigParsing(t *testing.T) {
 	expected := map[int]NerveService{
-		22222: NerveService{Name: "example_service", Namespace: "mesosstage_main"},
+		22224: NerveService{Name: "example_service", Namespace: "mesosstage_main"},
 		13752: NerveService{Name: "example_service", Namespace: "main"},
 	}
 
