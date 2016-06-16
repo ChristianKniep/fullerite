@@ -2,13 +2,19 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"fullerite/config"
 	"net"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
 // For dependency injection
-var ipGetter = getIps
+var (
+	ipGetter   = getIps
+	httpRegexp = regexp.MustCompile(`http`)
+)
 
 // example configuration::
 //
@@ -33,6 +39,12 @@ type nerveConfigData struct {
 type NerveService struct {
 	Name      string
 	Namespace string
+}
+
+// EndPoint defines a struct for endpoints
+type EndPoint struct {
+	Host string
+	Port string
 }
 
 // ParseNerveConfig is responsible for taking the JSON string coming in into a map of service:port
@@ -66,7 +78,7 @@ func ParseNerveConfig(raw *[]byte) (map[int]NerveService, error) {
 			service := new(NerveService)
 			service.Name = strings.Split(rawServiceName, ".")[0]
 			service.Namespace = strings.Split(rawServiceName, ".")[1]
-			port := config.GetAsInt(serviceConfig["port"], -1)
+			port := extractPort(serviceConfig)
 			if port != -1 {
 				results[port] = *service
 			}
@@ -74,6 +86,28 @@ func ParseNerveConfig(raw *[]byte) (map[int]NerveService, error) {
 	}
 
 	return results, nil
+}
+
+func extractPort(serviceConfig map[string]interface{}) int {
+	checkConfig := make(map[string]string)
+
+	if checkArray, ok := serviceConfig["checks"].([]interface{}); ok {
+		checkConfig = config.GetAsMap(checkArray[0])
+	}
+
+	if uri, ok := checkConfig["uri"]; ok {
+		uriArray := strings.Split(uri, "/")
+		protocol := strings.TrimSpace(uriArray[1])
+		port := uriArray[3]
+		if !httpRegexp.MatchString(protocol) {
+			return -1
+		}
+		if portInt, err := strconv.ParseInt(port, 10, 64); err == nil {
+			return int(portInt)
+		}
+		return -1
+	}
+	return -1
 }
 
 // getIps is responsible for getting all the ips that are associated with this NIC
@@ -103,4 +137,24 @@ func getIps() ([]string, error) {
 	}
 
 	return results, nil
+}
+
+// CreateMinimalNerveConfig creates a minimal nerve config
+func CreateMinimalNerveConfig(config map[string]EndPoint) map[string]map[string]map[string]interface{} {
+	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
+	serviceConfigs := make(map[string]map[string]interface{})
+	for service, endpoint := range config {
+		uriEndPoint := fmt.Sprintf("/http/%s/%s/status", service, endpoint.Port)
+		serviceConfigs[service] = map[string]interface{}{
+			"host": endpoint.Host,
+			"port": endpoint.Port,
+			"checks": []interface{}{
+				map[string]interface{}{
+					"uri": uriEndPoint,
+				},
+			},
+		}
+	}
+	minimalNerveConfig["services"] = serviceConfigs
+	return minimalNerveConfig
 }

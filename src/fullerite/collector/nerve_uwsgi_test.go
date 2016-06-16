@@ -2,6 +2,7 @@ package collector
 
 import (
 	"fullerite/metric"
+	"fullerite/util"
 	"path"
 	"test_utils"
 
@@ -460,14 +461,9 @@ func TestNerveUWSGICollect(t *testing.T) {
 
 	// assume format is http://ipaddr:port
 	ip, port := parseURL(server.URL)
-
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.things.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.things.and.stuff": util.EndPoint{ip, port},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
@@ -509,13 +505,9 @@ func TestNerveUWSGICollectWithSchema(t *testing.T) {
 	// assume format is http://ipaddr:port
 	ip, port := parseURL(server.URL)
 
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.things.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.things.and.stuff": util.EndPoint{ip, port},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
@@ -560,18 +552,10 @@ func TestNonConflictingServiceQueries(t *testing.T) {
 
 	goodIP, goodPort := parseURL(goodServer.URL)
 	badIP, badPort := parseURL(badServer.URL)
-
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.things.and.stuff": {
-			"host": goodIP,
-			"port": goodPort,
-		},
-		"other_service.does.lots.of.stuff": {
-			"host": badIP,
-			"port": badPort,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.things.and.stuff":    util.EndPoint{goodIP, goodPort},
+		"other_service.does.lots.of.stuff": util.EndPoint{badIP, badPort},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
