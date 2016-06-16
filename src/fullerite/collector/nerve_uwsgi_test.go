@@ -647,7 +647,7 @@ func TestNerveUWSGICollectWithSchema(t *testing.T) {
 
 func TestNerveJavaCollectWithSchema(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
-		w.Header().Set("Metrics-Schema", "java-1.0")
+		w.Header().Set("Metrics-Schema", "java-1.1")
 		fmt.Fprint(w, getTestJavaResponse())
 	}))
 	defer server.Close()
@@ -694,7 +694,7 @@ func TestNerveJavaCollectWithSchema(t *testing.T) {
 
 func TestNerveJavaCollectWithSchemaCumulativeCountersEnabled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
-		w.Header().Set("Metrics-Schema", "java-1.0")
+		w.Header().Set("Metrics-Schema", "java-1.1")
 		fmt.Fprint(w, getTestJavaResponse())
 	}))
 	defer server.Close()

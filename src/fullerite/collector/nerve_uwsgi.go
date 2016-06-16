@@ -91,7 +91,7 @@ func init() {
 	schemaMap = make(map[string]func(*[]byte, bool) ([]metric.Metric, error))
 	schemaMap["uwsgi.1.0"] = parseUWSGIMetrics10
 	schemaMap["uwsgi.1.1"] = parseUWSGIMetrics11
-	schemaMap["java-1.0"] = parseJavaMetrics
+	schemaMap["java-1.1"] = parseJavaMetrics
 	schemaMap["default"] = parseDefault
 }
 
