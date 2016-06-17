@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"fullerite/metric"
+	"fullerite/util"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -109,13 +110,10 @@ func TestNerveHTTPDCollect(t *testing.T) {
 	}))
 	defer server.Close()
 	ip, port := parseURL(server.URL)
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.things.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.things.and.stuff": util.EndPoint{ip, port},
+	})
+
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
 	assert.Nil(t, err)
@@ -169,18 +167,10 @@ func TestNerveHTTPDCollectWhiteList(t *testing.T) {
 	}))
 	defer server2.Close()
 	ip2, port2 := parseURL(server2.URL)
-
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.namespace1.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-		"test_service.namespace2.and.stuff": {
-			"host": ip2,
-			"port": port2,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.namespace1.and.stuff": util.EndPoint{ip, port},
+		"test_service.namespace2.and.stuff": util.EndPoint{ip2, port2},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
@@ -231,17 +221,10 @@ func TestNerveHTTPDCollectWithEmptyWhiteList(t *testing.T) {
 	defer server.Close()
 	ip, port := parseURL(server.URL)
 
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.namespace1.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-		"test_service.namespace2.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.namespace1.and.stuff": util.EndPoint{ip, port},
+		"test_service.namespace2.and.stuff": util.EndPoint{ip, port},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
@@ -284,18 +267,10 @@ func TestNerveHTTPDCollectWhiteListNotConfigured(t *testing.T) {
 	}))
 	defer server.Close()
 	ip, port := parseURL(server.URL)
-
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.namespace1.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-		"test_service.namespace2.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.namespace1.and.stuff": util.EndPoint{ip, port},
+		"test_service.namespace2.and.stuff": util.EndPoint{ip, port},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
