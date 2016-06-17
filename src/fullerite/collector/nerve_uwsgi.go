@@ -272,7 +272,21 @@ func parseJavaMetrics(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, e
 		return []metric.Metric{}, err
 	}
 
-	return getParsedMetrics(parsed, cumulCounterEnabled), nil
+	results := []metric.Metric{}
+	appendIt := func(metrics []metric.Metric, typeDimVal string, cumulCounterEnabled bool) {
+		if !cumulCounterEnabled {
+			metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
+		}
+		results = append(results, metrics...)
+	}
+
+	appendIt(convertToJavaMetrics(parsed.Gauges, metric.Gauge, cumulCounterEnabled), "gauge", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Counters, metric.Counter, cumulCounterEnabled), "counter", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Histograms, metric.Gauge, cumulCounterEnabled), "histogram", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer", cumulCounterEnabled)
+
+	return results, nil
 }
 
 // parseDropwizardMetrics takes json string in following format::
@@ -719,11 +733,11 @@ func getParsedMetrics(parsed *uwsgiJSONFormat1X, cumulCounterEnabled bool) []met
 		results = append(results, metrics...)
 	}
 
-	appendIt(convertToJavaMetrics(parsed.Gauges, metric.Gauge, cumulCounterEnabled), "gauge", cumulCounterEnabled)
-	appendIt(convertToJavaMetrics(parsed.Counters, metric.Counter, cumulCounterEnabled), "counter", cumulCounterEnabled)
-	appendIt(convertToJavaMetrics(parsed.Histograms, metric.Gauge, cumulCounterEnabled), "histogram", cumulCounterEnabled)
-	appendIt(convertToJavaMetrics(parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter", cumulCounterEnabled)
-	appendIt(convertToJavaMetrics(parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Gauges, metric.Gauge, cumulCounterEnabled), "gauge", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Counters, metric.Counter, cumulCounterEnabled), "counter", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Histograms, metric.Gauge, cumulCounterEnabled), "histogram", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer", cumulCounterEnabled)
 
 	return results
 }
