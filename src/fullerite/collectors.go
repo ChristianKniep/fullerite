@@ -5,14 +5,18 @@ import (
 	"fullerite/config"
 	"fullerite/handler"
 	"fullerite/metric"
+	"fullerite/util"
 
 	"fmt"
 	"strings"
 	"time"
 )
 
+var metricsBlacklist = make(map[string]string)
+
 func startCollectors(c config.Config) (collectors []collector.Collector) {
 	log.Info("Starting collectors...")
+	var element string
 
 	for _, name := range c.Collectors {
 		configFile := strings.Join([]string{c.CollectorsConfigPath, name}, "/") + ".conf"
@@ -21,13 +25,18 @@ func startCollectors(c config.Config) (collectors []collector.Collector) {
 		// will not have that space and needs to have it replaced with an underscore
 		// instead
 		configFile = strings.Replace(configFile, " ", "_", -1)
-		config, err := config.ReadCollectorConfig(configFile)
+		conf, err := config.ReadCollectorConfig(configFile)
 		if err != nil {
 			log.Error("Collector config failed to load for: ", name)
 			continue
 		}
+		if asInterface, exists := conf["metrics_blacklist"]; exists {
+			for _, element = range config.GetAsSlice(asInterface) {
+				metricsBlacklist[element] = name
+			}
+		}
 
-		collectorInst := startCollector(name, c, config)
+		collectorInst := startCollector(name, c, conf)
 		if collectorInst != nil {
 			collectors = append(collectors, collectorInst)
 		}
@@ -107,6 +116,12 @@ func readFromCollector(collector collector.Collector,
 		if val, ok := m.GetDimensionValue("collectorCanonicalName"); ok {
 			c = val
 			m.RemoveDimension("collectorCanonicalName")
+		}
+		// check if the metric is blacklisted, if so will continue
+		// processing the next one
+		//log.Error("GIULIA ", metricsBlacklist)
+		if util.StringInSlice(m.Name, c, metricsBlacklist) {
+			continue
 		}
 		emissionCounter[c]++
 		// collectorStatChans is an optional parameter. In case of ad-hoc collector
