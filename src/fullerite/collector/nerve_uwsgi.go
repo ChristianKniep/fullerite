@@ -234,17 +234,7 @@ func parseUWSGIMetrics10(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric
 		return []metric.Metric{}, err
 	}
 
-	results := []metric.Metric{}
-	appendIt := func(metrics []metric.Metric, typeDimVal string) {
-		metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
-		results = append(results, metrics...)
-	}
-
-	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge, false), "gauge")
-	appendIt(convertToMetrics(&parsed.Counters, metric.Counter, false), "counter")
-	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge, false), "histogram")
-	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter")
-	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer")
+	results := getParsedMetrics(parsed, cumulCounterEnabled)
 
 	return results, nil
 }
@@ -259,17 +249,7 @@ func parseUWSGIMetrics11(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric
 		return []metric.Metric{}, err
 	}
 
-	results := []metric.Metric{}
-	appendIt := func(metrics []metric.Metric, typeDimVal string) {
-		metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
-		results = append(results, metrics...)
-	}
-
-	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge, false), "gauge")
-	appendIt(convertToMetrics(&parsed.Counters, metric.Counter, false), "counter")
-	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge, false), "histogram")
-	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter")
-	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer")
+	results := getParsedMetrics(parsed, cumulCounterEnabled)
 
 	// This is necessary as Go doesn't allow us to type assert
 	// map[string]interface{} as map[string]string.
@@ -297,19 +277,7 @@ func parseJavaMetrics(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, e
 		return []metric.Metric{}, err
 	}
 
-	results := []metric.Metric{}
-	appendIt := func(metrics []metric.Metric, typeDimVal string) {
-		metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
-		results = append(results, metrics...)
-	}
-
-	appendIt(convertToJavaMetrics(&parsed.Gauges, metric.Gauge, false), "gauge")
-	appendIt(convertToJavaMetrics(&parsed.Counters, metric.Counter, false), "counter")
-	appendIt(convertToJavaMetrics(&parsed.Histograms, metric.Gauge, false), "histogram")
-	appendIt(convertToJavaMetrics(&parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter")
-	appendIt(convertToJavaMetrics(&parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer")
-
-	return results, nil
+	return getParsedMetrics(parsed, cumulCounterEnabled), nil
 }
 
 // parseDropwizardMetrics takes json string in following format::
@@ -738,4 +706,32 @@ func checkForMeterUnits(jsonMap map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+// getParsedMetrics returns a slice of metric.Metric starting from JSON data
+func getParsedMetrics(parsed *uwsgiJSONFormat1X, cumulCounterEnabled bool) []metric.Metric {
+	results := []metric.Metric{}
+	appendIt := func(metrics []metric.Metric, typeDimVal string, cumulCounterEnabled bool) {
+		if !cumulCounterEnabled {
+			metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
+		}
+		results = append(results, metrics...)
+	}
+
+	appendIt(convertToJavaMetrics(parsed.Gauges, metric.Gauge, cumulCounterEnabled), "gauge", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Counters, metric.Counter, cumulCounterEnabled), "counter", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Histograms, metric.Gauge, cumulCounterEnabled), "histogram", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer", cumulCounterEnabled)
+
+	return results
+}
+
+func addDimensionsFromName(m *metric.Metric, dimensions []string) {
+	var dimension []string
+	for i := 1; i < len(dimensions); i++ {
+		dimension = strings.Split(dimensions[i], "=")
+		m.AddDimension(dimension[0], dimension[1])
+	}
+
 }

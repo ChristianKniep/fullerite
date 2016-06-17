@@ -1,7 +1,5 @@
 package metric
 
-import "strings"
-
 // The different types of metrics that are supported
 const (
 	Gauge             = "gauge"
@@ -50,18 +48,6 @@ func (m *Metric) RemoveDimension(name string) {
 func (m *Metric) AddDimensions(dimensions map[string]string) {
 	for k, v := range dimensions {
 		m.AddDimension(k, v)
-	}
-}
-
-// AddDimensionsFromName adds multiple new dimensions to the Metric.
-// #TODO
-func (m *Metric) AddDimensionsFromName() {
-	var dimension []string
-	values := strings.Split(m.Name, ",")
-	m.Name = values[0]
-	for i := 1; i < len(values); i++ {
-		dimension = strings.Split(values[i], "=")
-		m.AddDimension(dimension[0], dimension[1])
 	}
 }
 
