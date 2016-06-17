@@ -263,12 +263,7 @@ func parseUWSGIMetrics11(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric
 }
 
 // parseJavaMetrics takes the json returned from the endpoint and converts
-// #TODO
-// it into raw metrics. We first check that the metrics returned have a float value
-// otherwise we skip the metric.
-//
-// @cumulCounterEnabled: if true it enables to create meter and timer counters as
-// Cumultative Counters instead of Gauges
+// it into raw metrics.
 func parseJavaMetrics(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, error) {
 	parsed := new(uwsgiJSONFormat1X)
 
@@ -412,20 +407,18 @@ func (n *nerveUWSGICollector) serviceInWhitelist(service string) bool {
 // automatiically it appends the dimensions::
 //		- rollup: the value in the nested map (e.g. "count", "mean_rate")
 //		- collector: this collector's name
-func convertToMetrics(metricMap *map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
+func convertToMetrics(metricMap map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
 	results := []metric.Metric{}
 
-	for metricName, metricData := range *metricMap {
+	for metricName, metricData := range metricMap {
 		tempResults := metricFromMap(metricData, metricName, metricType, cumulCounterEnabled)
 		results = append(results, tempResults...)
 	}
-
 	return results
 }
 
 // convertToJavaMetrics takes in data formatted like this::
-// #TODO
-// "pyramid_uwsgi_metrics.tweens.4xx-response": {
+// "metric_name.stuff,dim1=val1,dim2=val2": {
 // 		"count":     366116,
 //		"mean_rate": 0.2333071157843687,
 //		"m15_rate":  0.22693345170298124,
@@ -435,12 +428,15 @@ func convertToMetrics(metricMap *map[string]map[string]interface{}, metricType s
 // automatiically it appends the dimensions::
 //		- rollup: the value in the nested map (e.g. "count", "mean_rate")
 //		- collector: this collector's name
-func convertToJavaMetrics(metricMap *map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
+//		- dim1, dim2,.. dimN: these dimensions are embedded in the metric name
+func convertToJavaMetrics(metricMap map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
 	results := []metric.Metric{}
+	var values []string
 
-	for metricName, metricData := range *metricMap {
+	for metricName, metricData := range metricMap {
+		values = strings.Split(metricName, ",")
 		for rollup, value := range metricData {
-			mName := metricName
+			mName := values[0]
 			mType := metricType
 			matched, _ := regexp.MatchString("m[0-9]+_rate", rollup)
 
@@ -450,13 +446,15 @@ func convertToJavaMetrics(metricMap *map[string]map[string]interface{}, metricTy
 			if cumulCounterEnabled && matched {
 				continue
 			}
-			if cumulCounterEnabled && rollup == "count" {
-				mName = metricName + ".count"
-				mType = metric.CumulativeCounter
+			if cumulCounterEnabled && rollup != "value" {
+				mName = mName + "." + rollup
+				if rollup == "count" {
+					mType = metric.CumulativeCounter
+				}
 			}
-			tmpMetric, ok := createMetricFromDatam(rollup, value, mName, mType)
+			tmpMetric, ok := createMetricFromDatam(rollup, value, mName, mType, cumulCounterEnabled)
 			if ok {
-				tmpMetric.AddDimensionsFromName()
+				addDimensionsFromName(&tmpMetric, values)
 				results = append(results, tmpMetric)
 			}
 		}
@@ -485,11 +483,13 @@ func metricFromMap(metricMap map[string]interface{}, metricName string, metricTy
 		if cumulCounterEnabled && matched {
 			continue
 		}
-		if cumulCounterEnabled && rollup == "count" {
-			mName = metricName + ".count"
-			mType = metric.CumulativeCounter
+		if cumulCounterEnabled && rollup != "value" {
+			mName = metricName + "." + rollup
+			if rollup == "count" {
+				mType = metric.CumulativeCounter
+			}
 		}
-		tempMetric, ok := createMetricFromDatam(rollup, value, mName, mType)
+		tempMetric, ok := createMetricFromDatam(rollup, value, mName, mType, cumulCounterEnabled)
 		if ok {
 			results = append(results, tempMetric)
 		}
@@ -500,11 +500,12 @@ func metricFromMap(metricMap map[string]interface{}, metricName string, metricTy
 
 // createMetricFromDatam takes in rollup, value, metricName, metricType and returns metric only if
 // value was numeric
-func createMetricFromDatam(rollup string, value interface{}, metricName string, metricType string) (metric.Metric, bool) {
+func createMetricFromDatam(rollup string, value interface{}, metricName string, metricType string, cumulCounterEnabled bool) (metric.Metric, bool) {
 	m := metric.New(metricName)
 	m.MetricType = metricType
-	m.AddDimension("rollup", rollup)
-
+	if !cumulCounterEnabled {
+		m.AddDimension("rollup", rollup)
+	}
 	// only add things that have a numeric base
 	switch value.(type) {
 	case float64:
@@ -555,7 +556,7 @@ func createMetricFromDatam(rollup string, value interface{}, metricName string, 
 //  }
 func extractGaugeValue(key string, value interface{}, metricName []string) (metric.Metric, bool) {
 	compositeMetricName := strings.Join(append(metricName, key), ".")
-	return createMetricFromDatam("value", value, compositeMetricName, "GAUGE")
+	return createMetricFromDatam("value", value, compositeMetricName, "GAUGE", false)
 }
 
 // collectGauge emits metric array for maps that contain guage values:
@@ -605,7 +606,7 @@ func collectHistogram(jsonMap map[string]interface{},
 			}
 
 			compositeMetricName := strings.Join(metricName, ".")
-			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType)
+			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType, false)
 			if ok {
 				results = append(results, m)
 			}
@@ -652,7 +653,7 @@ func collectRate(jsonMap map[string]interface{}, metricName []string) []metric.M
 			}
 
 			compositeMetricName := strings.Join(metricName, ".")
-			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType)
+			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType, false)
 			if ok {
 				results = append(results, m)
 			}
@@ -688,7 +689,7 @@ func collectMeter(jsonMap map[string]interface{}, metricName []string) []metric.
 			}
 
 			compositeMetricName := strings.Join(metricName, ".")
-			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType)
+			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType, false)
 			if ok {
 				results = append(results, m)
 			}
