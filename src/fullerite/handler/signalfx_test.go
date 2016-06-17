@@ -129,4 +129,9 @@ func TestSignalFxSanitation(t *testing.T) {
 	datapoint2 := s.convertToProto(m2)
 
 	assert.Equal(t, datapoint1.GetMetric(), datapoint2.GetMetric(), "the two metrics should be the same")
+	for i := 0; i < len(datapoint1.GetDimensions())-1; i++ {
+		for j := i + 1; j < len(datapoint1.GetDimensions()); j++ {
+			assert.NotEqual(t, datapoint1.GetDimensions()[i].GetKey(), datapoint1.GetDimensions()[j].GetKey(), "the two dimensions should be different")
+		}
+	}
 }
