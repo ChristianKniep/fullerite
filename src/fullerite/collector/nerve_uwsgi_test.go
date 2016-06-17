@@ -122,7 +122,7 @@ func getTestJavaResponse() string {
 	"timers": {
 		"some_timer": {
 			"count": 200,
-			"average": 123
+			"value": 123
 		},
 		"othertimer,dimX=valX": {
 			"mean": 345,
@@ -237,8 +237,8 @@ func validateJavaResults(t *testing.T, actual []metric.Metric, serviceName strin
 			assert.Equal(t, "valX", dim)
 		case "some_timer":
 			val, exists := map[string]float64{
-				"average": 123,
-				"count":   200,
+				"value": 123,
+				"count": 200,
 			}[rollup]
 			assert.Equal(t, "timer", metricTypeDim)
 			assert.True(t, exists)
@@ -404,7 +404,7 @@ func TestUWSGIMetricConversion(t *testing.T) {
 		"units": "events/second",
 	}
 
-	actual := convertToMetrics(&testMeters, "metricType", false)
+	actual := convertToMetrics(testMeters, "metricType", false)
 
 	// only the numbers are made
 	assert.Equal(t, 10, len(actual))
@@ -467,50 +467,18 @@ func TestUWSGIMetricConversionCumulativeCountersEnabled(t *testing.T) {
 		"units": "events/second",
 	}
 
-	actual := convertToMetrics(&testMeters, "metricType", true)
+	actual := convertToMetrics(testMeters, "metricType", true)
 
 	for _, m := range actual {
-		rollup, _ := m.GetDimensionValue("rollup")
 		switch m.Name {
-		case "pyramid_uwsgi_metrics.tweens.5xx-responses":
-			val, exists := map[string]float64{
-				"mean_rate": 0.0006172935981330262,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
-			_, exists = map[string]float64{
-				"m15_rate": 2.8984757611832113e-41,
-				"m5_rate":  1.8870959302511822e-119,
-				"m1_rate":  3e-323,
-				"count":    957,
-			}[rollup]
-			assert.False(t, exists, "more metrics than what expected on rollup "+rollup)
-		case "pyramid_uwsgi_metrics.tweens.4xx-responses":
-			val, exists := map[string]float64{
-				"mean_rate": 0.2333071157843687,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
-			_, exists = map[string]float64{
-				"m15_rate":  0.22693345170298124,
-				"mean_rate": 0.2333071157843687,
-				"m5_rate":   0.21433439128223822,
-				"m1_rate":   0.14771304656654516,
-				"count":     366116,
-			}[rollup]
-			assert.True(t, exists, "more metrics than what expected on rollup  "+rollup)
+		case "pyramid_uwsgi_metrics.tweens.5xx-responses.mean_rate":
+			assert.Equal(t, 0.0006172935981330262, m.Value)
+		case "pyramid_uwsgi_metrics.tweens.4xx-responses.mean_rate":
+			assert.Equal(t, 0.2333071157843687, m.Value)
 		case "pyramid_uwsgi_metrics.tweens.5xx-responses.count":
-			val, exists := map[string]float64{
-				"count": 957,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
+			assert.Equal(t, 957.0, m.Value)
 		case "pyramid_uwsgi_metrics.tweens.4xx-responses.count":
-			val, exists := map[string]float64{
-				"count": 366116,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
+			assert.Equal(t, 366116.0, m.Value)
 		default:
 			t.Fatalf("unknown metric name %s", m.Name)
 		}
@@ -647,13 +615,9 @@ func TestNerveJavaCollectWithSchema(t *testing.T) {
 	// assume format is http://ipaddr:port
 	ip, port := parseURL(server.URL)
 
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.things.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.things.and.stuff": util.EndPoint{ip, port},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
@@ -694,13 +658,9 @@ func TestNerveJavaCollectWithSchemaCumulativeCountersEnabled(t *testing.T) {
 	// assume format is http://ipaddr:port
 	ip, port := parseURL(server.URL)
 
-	minimalNerveConfig := make(map[string]map[string]map[string]interface{})
-	minimalNerveConfig["services"] = map[string]map[string]interface{}{
-		"test_service.things.and.stuff": {
-			"host": ip,
-			"port": port,
-		},
-	}
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.namespace": util.EndPoint{ip, port},
+	})
 
 	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
 	defer os.Remove(tmpFile.Name())
@@ -737,49 +697,22 @@ func TestNerveJavaCollectWithSchemaCumulativeCountersEnabled(t *testing.T) {
 	assert.Equal(t, 7, len(actual))
 
 	for _, m := range actual {
-		rollup, _ := m.GetDimensionValue("rollup")
 		switch m.Name {
-		case "Acounter":
-			val, exists := map[string]float64{
-				"firstrollup":  134,
-				"count":        100,
-				"secondrollup": 89,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
+		case "Acounter.firstrollup":
+			assert.Equal(t, 134.0, m.Value)
+		case "Acounter.count":
+			assert.Equal(t, 100.0, m.Value)
+		case "Acounter.secondrollup":
+			assert.Equal(t, 89.0, m.Value)
 		case "some_timer":
-			val, exists := map[string]float64{
-				"average": 123,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
-			_, exists = map[string]float64{
-				"count": 200,
-			}[rollup]
-			assert.False(t, exists, "more metrics than what expected on rollup  "+rollup)
+			assert.Equal(t, 123.0, m.Value)
 		case "some_timer.count":
-			val, exists := map[string]float64{
-				"count": 200,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
+			assert.Equal(t, 200.0, m.Value)
 			assert.Equal(t, metric.CumulativeCounter, m.MetricType)
-		case "othertimer":
-			val, exists := map[string]float64{
-				"mean": 345,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
-			_, exists = map[string]float64{
-				"m1_rate": 3e-323,
-			}[rollup]
-			assert.False(t, exists, "more metrics than what expected on rollup  "+rollup)
-		case "some_random_metric":
-			val, exists := map[string]float64{
-				"rollup1": 12,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
+		case "othertimer.mean":
+			assert.Equal(t, 345.0, m.Value)
+		case "some_random_metric.rollup1":
+			assert.Equal(t, 12.0, m.Value)
 		default:
 			t.Fatalf("unknown metric name %s", m.Name)
 		}
