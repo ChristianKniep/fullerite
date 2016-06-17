@@ -82,8 +82,17 @@ type nerveUWSGICollector struct {
 	servicesWhitelist []string
 }
 
+// Parser map for schema matching
+var schemaMap map[string]func(*[]byte, bool) ([]metric.Metric, error)
+
 func init() {
 	RegisterCollector("NerveUWSGI", newNerveUWSGI)
+	// Enumerate schema-parser map:
+	schemaMap = make(map[string]func(*[]byte, bool) ([]metric.Metric, error))
+	schemaMap["uwsgi.1.0"] = parseUWSGIMetrics10
+	schemaMap["uwsgi.1.1"] = parseUWSGIMetrics11
+	schemaMap["java-1.1"] = parseJavaMetrics
+	schemaMap["default"] = parseDefault
 }
 
 func newNerveUWSGI(channel chan metric.Metric, initialInterval int, log *l.Entry) Collector {
@@ -145,7 +154,7 @@ func (n *nerveUWSGICollector) queryService(serviceName string, port int) {
 		serviceLog.Warn("Failed to query endpoint ", endpoint, ": ", err)
 		return
 	}
-	metrics, err := parseMetrics(&rawResponse, schemaVer, n.serviceInWhitelist(serviceName))
+	metrics, err := schemaMap[schemaVer](&rawResponse, n.serviceInWhitelist(serviceName))
 	if err != nil {
 		serviceLog.Warn("Failed to parse response into metrics: ", err)
 		return
@@ -198,56 +207,84 @@ func queryEndpoint(endpoint string, timeout int) ([]byte, string, error) {
 	return txt, schemaVer, nil
 }
 
-// parseMetrics parse all the metrics according to the schemaVer.
-// Always it tries to parse the metric with a base JSON format
-// if it doesnt succed it will try with different parsing functions
-func parseMetrics(raw *[]byte, schemaVer string, cumulCounterEnabled bool) ([]metric.Metric, error) {
-	parsed := new(uwsgiJSONFormat1X)
-
-	err := json.Unmarshal(*raw, &parsed)
-	if err != nil {
-		return []metric.Metric{}, err
-	}
-
-	results, err := parseUWSGIMetrics(parsed, cumulCounterEnabled)
+// parseDefault is the fallback parser if no 'Metrics-Schema' is provided in the
+// response header from a service query
+func parseDefault(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, error) {
+	results, err := parseUWSGIMetrics10(raw, cumulCounterEnabled)
 	if err != nil {
 		return results, err
 	}
 
-	if schemaVer == "uwsgi.1.1" {
-		// This is necessary as Go doesn't allow us to type assert
-		// map[string]interface{} as map[string]string.
-		// Basically go doesn't allow type assertions for interface{}'s nested
-		// inside data structures across the entire structure since it is a linearly
-		// complex action
-		for k, v := range parsed.ServiceDims {
-			metric.AddToAll(&results, map[string]string{k: v.(string)})
-		}
-	} else if schemaVer == "default" && len(results) == 0 {
+	if len(results) == 0 {
+		// If parsing using UWSGI format did not work, the output is probably
+		// in Dropwizard format and should be handled as such.
 		return parseDropwizardMetrics(raw)
 	}
+	return results, nil
+}
+
+// parseUWSGIMetrics10 takes the json returned from the endpoint and converts
+// it into raw metrics. We first check that the metrics returned have a float value
+// otherwise we skip the metric.
+func parseUWSGIMetrics10(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, error) {
+	parsed := new(uwsgiJSONFormat1X)
+
+	err := json.Unmarshal(*raw, parsed)
+	if err != nil {
+		return []metric.Metric{}, err
+	}
+
+	results := getParsedMetrics(parsed, cumulCounterEnabled)
 
 	return results, nil
 }
 
-// parseUWSGIMetrics takes the json returned from the endpoint and converts
-// it into raw metrics. We first check that the metrics returned have a float value
-// otherwise we skip the metric.
-//
-// @cumulCounterEnabled: if true it enables to create meter and timer counters as
-// Cumultative Counters instead of Gauges
-func parseUWSGIMetrics(parsed *uwsgiJSONFormat1X, cumulCounterEnabled bool) ([]metric.Metric, error) {
+// parseUWSGIMetrics11 will parse UWSGI metrics under the assumption of
+// the response header containing a Metrics-Schema version 'uwsgi.1.1'.
+func parseUWSGIMetrics11(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, error) {
+	parsed := new(uwsgiJSONFormat1X)
+
+	err := json.Unmarshal(*raw, parsed)
+	if err != nil {
+		return []metric.Metric{}, err
+	}
+
+	results := getParsedMetrics(parsed, cumulCounterEnabled)
+
+	// This is necessary as Go doesn't allow us to type assert
+	// map[string]interface{} as map[string]string.
+	// Basically go doesn't allow type assertions for interface{}'s nested
+	// inside data structures across the entire structure since it is a linearly
+	// complex action
+	for k, v := range parsed.ServiceDims {
+		metric.AddToAll(&results, map[string]string{k: v.(string)})
+	}
+	return results, nil
+}
+
+// parseJavaMetrics takes the json returned from the endpoint and converts
+// it into raw metrics.
+func parseJavaMetrics(raw *[]byte, cumulCounterEnabled bool) ([]metric.Metric, error) {
+	parsed := new(uwsgiJSONFormat1X)
+
+	err := json.Unmarshal(*raw, parsed)
+	if err != nil {
+		return []metric.Metric{}, err
+	}
+
 	results := []metric.Metric{}
-	appendIt := func(metrics []metric.Metric, typeDimVal string) {
-		metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
+	appendIt := func(metrics []metric.Metric, typeDimVal string, cumulCounterEnabled bool) {
+		if !cumulCounterEnabled {
+			metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
+		}
 		results = append(results, metrics...)
 	}
 
-	appendIt(convertToMetrics(&parsed.Gauges, metric.Gauge, false), "gauge")
-	appendIt(convertToMetrics(&parsed.Counters, metric.Counter, false), "counter")
-	appendIt(convertToMetrics(&parsed.Histograms, metric.Gauge, false), "histogram")
-	appendIt(convertToMetrics(&parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter")
-	appendIt(convertToMetrics(&parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer")
+	appendIt(convertToJavaMetrics(parsed.Gauges, metric.Gauge, cumulCounterEnabled), "gauge", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Counters, metric.Counter, cumulCounterEnabled), "counter", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Histograms, metric.Gauge, cumulCounterEnabled), "histogram", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter", cumulCounterEnabled)
+	appendIt(convertToJavaMetrics(parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer", cumulCounterEnabled)
 
 	return results, nil
 }
@@ -384,12 +421,57 @@ func (n *nerveUWSGICollector) serviceInWhitelist(service string) bool {
 // automatiically it appends the dimensions::
 //		- rollup: the value in the nested map (e.g. "count", "mean_rate")
 //		- collector: this collector's name
-func convertToMetrics(metricMap *map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
+func convertToMetrics(metricMap map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
 	results := []metric.Metric{}
 
-	for metricName, metricData := range *metricMap {
+	for metricName, metricData := range metricMap {
 		tempResults := metricFromMap(metricData, metricName, metricType, cumulCounterEnabled)
 		results = append(results, tempResults...)
+	}
+	return results
+}
+
+// convertToJavaMetrics takes in data formatted like this::
+// "metric_name.stuff,dim1=val1,dim2=val2": {
+// 		"count":     366116,
+//		"mean_rate": 0.2333071157843687,
+//		"m15_rate":  0.22693345170298124,
+//		"units":     "events/second"
+// }
+// and outputs a metric for each name:rollup pair where the value is a float/int
+// automatiically it appends the dimensions::
+//		- rollup: the value in the nested map (e.g. "count", "mean_rate")
+//		- collector: this collector's name
+//		- dim1, dim2,.. dimN: these dimensions are embedded in the metric name
+func convertToJavaMetrics(metricMap map[string]map[string]interface{}, metricType string, cumulCounterEnabled bool) []metric.Metric {
+	results := []metric.Metric{}
+	var values []string
+
+	for metricName, metricData := range metricMap {
+		values = strings.Split(metricName, ",")
+		for rollup, value := range metricData {
+			mName := values[0]
+			mType := metricType
+			matched, _ := regexp.MatchString("m[0-9]+_rate", rollup)
+
+			// If cumulCounterEnabled is true:
+			//		1. change metric type meter.count and timer.count moving them to cumulative counter
+			//		2. don't send back metered metrics (rollup == 'mXX_rate')
+			if cumulCounterEnabled && matched {
+				continue
+			}
+			if cumulCounterEnabled && rollup != "value" {
+				mName = mName + "." + rollup
+				if rollup == "count" {
+					mType = metric.CumulativeCounter
+				}
+			}
+			tmpMetric, ok := createMetricFromDatam(rollup, value, mName, mType, cumulCounterEnabled)
+			if ok {
+				addDimensionsFromName(&tmpMetric, values)
+				results = append(results, tmpMetric)
+			}
+		}
 	}
 
 	return results
@@ -415,11 +497,13 @@ func metricFromMap(metricMap map[string]interface{}, metricName string, metricTy
 		if cumulCounterEnabled && matched {
 			continue
 		}
-		if cumulCounterEnabled && rollup == "count" {
-			mName = metricName + ".count"
-			mType = metric.CumulativeCounter
+		if cumulCounterEnabled && rollup != "value" {
+			mName = metricName + "." + rollup
+			if rollup == "count" {
+				mType = metric.CumulativeCounter
+			}
 		}
-		tempMetric, ok := createMetricFromDatam(rollup, value, mName, mType)
+		tempMetric, ok := createMetricFromDatam(rollup, value, mName, mType, cumulCounterEnabled)
 		if ok {
 			results = append(results, tempMetric)
 		}
@@ -430,11 +514,12 @@ func metricFromMap(metricMap map[string]interface{}, metricName string, metricTy
 
 // createMetricFromDatam takes in rollup, value, metricName, metricType and returns metric only if
 // value was numeric
-func createMetricFromDatam(rollup string, value interface{}, metricName string, metricType string) (metric.Metric, bool) {
+func createMetricFromDatam(rollup string, value interface{}, metricName string, metricType string, cumulCounterEnabled bool) (metric.Metric, bool) {
 	m := metric.New(metricName)
 	m.MetricType = metricType
-	m.AddDimension("rollup", rollup)
-
+	if !cumulCounterEnabled {
+		m.AddDimension("rollup", rollup)
+	}
 	// only add things that have a numeric base
 	switch value.(type) {
 	case float64:
@@ -485,7 +570,7 @@ func createMetricFromDatam(rollup string, value interface{}, metricName string, 
 //  }
 func extractGaugeValue(key string, value interface{}, metricName []string) (metric.Metric, bool) {
 	compositeMetricName := strings.Join(append(metricName, key), ".")
-	return createMetricFromDatam("value", value, compositeMetricName, "GAUGE")
+	return createMetricFromDatam("value", value, compositeMetricName, "GAUGE", false)
 }
 
 // collectGauge emits metric array for maps that contain guage values:
@@ -535,7 +620,7 @@ func collectHistogram(jsonMap map[string]interface{},
 			}
 
 			compositeMetricName := strings.Join(metricName, ".")
-			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType)
+			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType, false)
 			if ok {
 				results = append(results, m)
 			}
@@ -582,7 +667,7 @@ func collectRate(jsonMap map[string]interface{}, metricName []string) []metric.M
 			}
 
 			compositeMetricName := strings.Join(metricName, ".")
-			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType)
+			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType, false)
 			if ok {
 				results = append(results, m)
 			}
@@ -618,7 +703,7 @@ func collectMeter(jsonMap map[string]interface{}, metricName []string) []metric.
 			}
 
 			compositeMetricName := strings.Join(metricName, ".")
-			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType)
+			m, ok := createMetricFromDatam(key, value, compositeMetricName, metricType, false)
 			if ok {
 				results = append(results, m)
 			}
@@ -636,4 +721,32 @@ func checkForMeterUnits(jsonMap map[string]interface{}) bool {
 		}
 	}
 	return false
+}
+
+// getParsedMetrics returns a slice of metric.Metric starting from JSON data
+func getParsedMetrics(parsed *uwsgiJSONFormat1X, cumulCounterEnabled bool) []metric.Metric {
+	results := []metric.Metric{}
+	appendIt := func(metrics []metric.Metric, typeDimVal string, cumulCounterEnabled bool) {
+		if !cumulCounterEnabled {
+			metric.AddToAll(&metrics, map[string]string{"type": typeDimVal})
+		}
+		results = append(results, metrics...)
+	}
+
+	appendIt(convertToMetrics(parsed.Gauges, metric.Gauge, cumulCounterEnabled), "gauge", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Counters, metric.Counter, cumulCounterEnabled), "counter", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Histograms, metric.Gauge, cumulCounterEnabled), "histogram", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Meters, metric.Gauge, cumulCounterEnabled), "meter", cumulCounterEnabled)
+	appendIt(convertToMetrics(parsed.Timers, metric.Gauge, cumulCounterEnabled), "timer", cumulCounterEnabled)
+
+	return results
+}
+
+func addDimensionsFromName(m *metric.Metric, dimensions []string) {
+	var dimension []string
+	for i := 1; i < len(dimensions); i++ {
+		dimension = strings.Split(dimensions[i], "=")
+		m.AddDimension(dimension[0], dimension[1])
+	}
+
 }

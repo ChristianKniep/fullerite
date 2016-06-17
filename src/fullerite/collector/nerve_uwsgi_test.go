@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	l "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -108,6 +109,36 @@ func getTestUWSGIResponse() string {
 	`
 }
 
+func getTestJavaResponse() string {
+	return `{
+	"counters": {
+		"Acounter,dim1=val1,dim2=val2,dim3=val3":{
+			"count": 100,
+			"firstrollup": 134,
+			"secondrollup": 89
+		}
+	},
+	"meters": {},
+	"timers": {
+		"some_timer": {
+			"count": 200,
+			"value": 123
+		},
+		"othertimer,dimX=valX": {
+			"mean": 345,
+			"m1_rate": 3e-323
+		}
+	},
+	"gauges": {
+		"some_random_metric": {
+			"rollup1": 12
+		}
+	},
+	"histograms": {}
+	}
+	`
+}
+
 func getTestSchemaUWSGIResponse() string {
 	return `{
     "service_dims": {
@@ -174,6 +205,73 @@ func validateUWSGIResults(t *testing.T, actual []metric.Metric) {
 			assert.True(t, exists)
 			assert.Equal(t, val, m.Value)
 		}
+	}
+}
+
+func validateJavaResults(t *testing.T, actual []metric.Metric, serviceName string, servicePort string) {
+	assert.Equal(t, 8, len(actual))
+
+	for _, m := range actual {
+		metricTypeDim, exists := m.GetDimensionValue("type")
+		assert.True(t, exists)
+		rollup, exists := m.GetDimensionValue("rollup")
+		assert.True(t, exists)
+
+		switch m.Name {
+		case "some_random_metric":
+			assert.Equal(t, "rollup1", rollup)
+			assert.Equal(t, "gauge", metricTypeDim)
+			assert.Equal(t, 12.0, m.Value)
+			assert.Equal(t, metric.Gauge, m.MetricType)
+		case "othertimer":
+			val, exists := map[string]float64{
+				"mean":    345.0,
+				"m1_rate": 3e-323,
+			}[rollup]
+			assert.Equal(t, "timer", metricTypeDim)
+			assert.True(t, exists)
+			assert.Equal(t, metric.Gauge, m.MetricType)
+			assert.Equal(t, val, m.Value)
+			dim, exists := m.GetDimensionValue("dimX")
+			assert.True(t, exists)
+			assert.Equal(t, "valX", dim)
+		case "some_timer":
+			val, exists := map[string]float64{
+				"value": 123,
+				"count": 200,
+			}[rollup]
+			assert.Equal(t, "timer", metricTypeDim)
+			assert.True(t, exists)
+			assert.Equal(t, metric.Gauge, m.MetricType)
+			assert.Equal(t, val, m.Value)
+		case "ACounter":
+			assert.Equal(t, metric.Counter, m.MetricType)
+			val, exists := map[string]float64{
+				"firstrollup":  134,
+				"secondrollup": 89,
+				"counter":      100,
+			}[rollup]
+			assert.Equal(t, "counter", metricTypeDim)
+			assert.True(t, exists)
+			assert.Equal(t, val, m.Value)
+			dim, exists := m.GetDimensionValue("dim1")
+			assert.True(t, exists)
+			assert.Equal(t, "val1", dim)
+			dim, exists = m.GetDimensionValue("dim2")
+			assert.True(t, exists)
+			assert.Equal(t, "val2", dim)
+			dim, exists = m.GetDimensionValue("dim3")
+			assert.True(t, exists)
+			assert.Equal(t, "val3", dim)
+		}
+
+		dim, exists := m.GetDimensionValue("service")
+		assert.True(t, exists)
+		assert.Equal(t, serviceName, dim)
+
+		val, exists := m.GetDimensionValue("port")
+		assert.True(t, exists)
+		assert.Equal(t, servicePort, val)
 	}
 }
 
@@ -306,7 +404,7 @@ func TestUWSGIMetricConversion(t *testing.T) {
 		"units": "events/second",
 	}
 
-	actual := convertToMetrics(&testMeters, "metricType", false)
+	actual := convertToMetrics(testMeters, "metricType", false)
 
 	// only the numbers are made
 	assert.Equal(t, 10, len(actual))
@@ -369,50 +467,18 @@ func TestUWSGIMetricConversionCumulativeCountersEnabled(t *testing.T) {
 		"units": "events/second",
 	}
 
-	actual := convertToMetrics(&testMeters, "metricType", true)
+	actual := convertToMetrics(testMeters, "metricType", true)
 
 	for _, m := range actual {
-		rollup, _ := m.GetDimensionValue("rollup")
 		switch m.Name {
-		case "pyramid_uwsgi_metrics.tweens.5xx-responses":
-			val, exists := map[string]float64{
-				"mean_rate": 0.0006172935981330262,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
-			_, exists = map[string]float64{
-				"m15_rate": 2.8984757611832113e-41,
-				"m5_rate":  1.8870959302511822e-119,
-				"m1_rate":  3e-323,
-				"count":    957,
-			}[rollup]
-			assert.False(t, exists, "more metrics than what expected on rollup "+rollup)
-		case "pyramid_uwsgi_metrics.tweens.4xx-responses":
-			val, exists := map[string]float64{
-				"mean_rate": 0.2333071157843687,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value, "mismatching value on rollup "+rollup)
-			_, exists = map[string]float64{
-				"m15_rate":  0.22693345170298124,
-				"mean_rate": 0.2333071157843687,
-				"m5_rate":   0.21433439128223822,
-				"m1_rate":   0.14771304656654516,
-				"count":     366116,
-			}[rollup]
-			assert.True(t, exists, "more metrics than what expected on rollup  "+rollup)
+		case "pyramid_uwsgi_metrics.tweens.5xx-responses.mean_rate":
+			assert.Equal(t, 0.0006172935981330262, m.Value)
+		case "pyramid_uwsgi_metrics.tweens.4xx-responses.mean_rate":
+			assert.Equal(t, 0.2333071157843687, m.Value)
 		case "pyramid_uwsgi_metrics.tweens.5xx-responses.count":
-			val, exists := map[string]float64{
-				"count": 957,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
+			assert.Equal(t, 957.0, m.Value)
 		case "pyramid_uwsgi_metrics.tweens.4xx-responses.count":
-			val, exists := map[string]float64{
-				"count": 366116,
-			}[rollup]
-			assert.True(t, exists, "unknown rollup "+rollup)
-			assert.Equal(t, val, m.Value)
+			assert.Equal(t, 366116.0, m.Value)
 		default:
 			t.Fatalf("unknown metric name %s", m.Name)
 		}
@@ -422,7 +488,7 @@ func TestUWSGIMetricConversionCumulativeCountersEnabled(t *testing.T) {
 func TestUWSGIResponseConversion(t *testing.T) {
 	uwsgiRsp := []byte(getTestUWSGIResponse())
 
-	actual, err := parseMetrics(&uwsgiRsp, "default", false)
+	actual, err := parseDefault(&uwsgiRsp, false)
 	assert.Nil(t, err)
 	validateUWSGIResults(t, actual)
 	for _, m := range actual {
@@ -539,6 +605,120 @@ func TestNerveUWSGICollectWithSchema(t *testing.T) {
 	validateEmptyChannel(t, inst.Channel())
 }
 
+func TestNerveJavaCollectWithSchema(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
+		w.Header().Set("Metrics-Schema", "java-1.1")
+		fmt.Fprint(w, getTestJavaResponse())
+	}))
+	defer server.Close()
+
+	// assume format is http://ipaddr:port
+	ip, port := parseURL(server.URL)
+
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.things.and.stuff": util.EndPoint{ip, port},
+	})
+
+	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
+	defer os.Remove(tmpFile.Name())
+	assert.Nil(t, err)
+
+	marshalled, err := json.Marshal(minimalNerveConfig)
+	assert.Nil(t, err)
+
+	_, err = tmpFile.Write(marshalled)
+	assert.Nil(t, err)
+
+	cfg := map[string]interface{}{
+		"configFilePath": tmpFile.Name(),
+		"queryPath":      "",
+	}
+
+	inst := getTestNerveUWSGI()
+	inst.Configure(cfg)
+
+	go inst.Collect()
+
+	actual := []metric.Metric{}
+	for i := 0; i < 8; i++ {
+		actual = append(actual, <-inst.Channel())
+	}
+
+	validateJavaResults(t, actual, "test_service", port)
+	validateEmptyChannel(t, inst.Channel())
+}
+
+func TestNerveJavaCollectWithSchemaCumulativeCountersEnabled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
+		w.Header().Set("Metrics-Schema", "java-1.1")
+		fmt.Fprint(w, getTestJavaResponse())
+	}))
+	defer server.Close()
+
+	// assume format is http://ipaddr:port
+	ip, port := parseURL(server.URL)
+
+	minimalNerveConfig := util.CreateMinimalNerveConfig(map[string]util.EndPoint{
+		"test_service.namespace": util.EndPoint{ip, port},
+	})
+
+	tmpFile, err := ioutil.TempFile("", "fullerite_testing")
+	defer os.Remove(tmpFile.Name())
+	assert.Nil(t, err)
+
+	marshalled, err := json.Marshal(minimalNerveConfig)
+	assert.Nil(t, err)
+
+	_, err = tmpFile.Write(marshalled)
+	assert.Nil(t, err)
+
+	cfg := map[string]interface{}{
+		"configFilePath":    tmpFile.Name(),
+		"queryPath":         "",
+		"servicesWhitelist": []string{"test_service"},
+	}
+
+	inst := getTestNerveUWSGI()
+	inst.Configure(cfg)
+
+	go inst.Collect()
+
+	actual := []metric.Metric{}
+	flag := true
+	for flag == true {
+		select {
+		case metric := <-inst.Channel():
+			actual = append(actual, metric)
+		case <-time.After(2 * time.Second):
+			flag = false
+			break
+		}
+	}
+	assert.Equal(t, 7, len(actual))
+
+	for _, m := range actual {
+		switch m.Name {
+		case "Acounter.firstrollup":
+			assert.Equal(t, 134.0, m.Value)
+		case "Acounter.count":
+			assert.Equal(t, 100.0, m.Value)
+		case "Acounter.secondrollup":
+			assert.Equal(t, 89.0, m.Value)
+		case "some_timer":
+			assert.Equal(t, 123.0, m.Value)
+		case "some_timer.count":
+			assert.Equal(t, 200.0, m.Value)
+			assert.Equal(t, metric.CumulativeCounter, m.MetricType)
+		case "othertimer.mean":
+			assert.Equal(t, 345.0, m.Value)
+		case "some_random_metric.rollup1":
+			assert.Equal(t, 12.0, m.Value)
+		default:
+			t.Fatalf("unknown metric name %s", m.Name)
+		}
+	}
+}
+
 func TestNonConflictingServiceQueries(t *testing.T) {
 	goodServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, rsp *http.Request) {
 		fmt.Fprint(w, getTestUWSGIResponse())
@@ -603,7 +783,7 @@ func TestDropwizardCounter(t *testing.T) {
 }
         `)
 
-	metrics, err := parseMetrics(&rawData, "default", false)
+	metrics, err := parseDefault(&rawData, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(metrics))
 }
@@ -619,7 +799,7 @@ func TestInvalidDropwizard(t *testing.T) {
 }
         `)
 
-	metrics, err := parseMetrics(&rawData, "default", false)
+	metrics, err := parseDefault(&rawData, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(metrics))
 }
@@ -658,7 +838,7 @@ func TestDropJVMMetrics(t *testing.T) {
 }
         `)
 
-	metrics, err := parseMetrics(&rawData, "default", false)
+	metrics, err := parseDefault(&rawData, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 14, len(metrics))
 }
@@ -691,7 +871,7 @@ func TestDropwizardTimer(t *testing.T) {
   }
 }
         `)
-	metrics, err := parseMetrics(&rawData, "default", false)
+	metrics, err := parseDefault(&rawData, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 9, len(metrics))
 
@@ -716,7 +896,7 @@ func TestDropwizardGauge(t *testing.T) {
   }
 }
         `)
-	metrics, err := parseMetrics(&rawData, "default", false)
+	metrics, err := parseDefault(&rawData, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(metrics))
 }
@@ -727,7 +907,7 @@ func TestDropwizardJsonInput(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	metrics, err := parseMetrics(&dat, "default", false)
+	metrics, err := parseDefault(&dat, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 560, len(metrics))
 }
@@ -753,7 +933,7 @@ func TestDropwizardHistogram(t *testing.T) {
   }
 }
         `)
-	metrics, err := parseMetrics(&rawData, "default", false)
+	metrics, err := parseDefault(&rawData, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 11, len(metrics))
 	counterMetric, ok := extractMetricWithType(metrics, "COUNTER")
