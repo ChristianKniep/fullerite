@@ -61,13 +61,3 @@ func runeInSlice(a rune, list []rune) bool {
 	}
 	return false
 }
-
-// StringInSlice iterates over a slice checking if it contains a specific string
-func StringInSlice(metricName string, collectorName string, list map[string]string) bool {
-	for k, v := range list {
-		if metricName == k && collectorName == v {
-			return true
-		}
-	}
-	return false
-}
