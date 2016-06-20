@@ -5,14 +5,13 @@ import (
 	"fullerite/config"
 	"fullerite/handler"
 	"fullerite/metric"
-	"fullerite/util"
 
 	"fmt"
 	"strings"
 	"time"
 )
 
-var metricsBlacklist = make(map[string]string)
+var metricsBlacklist []string
 
 func startCollectors(c config.Config) (collectors []collector.Collector) {
 	log.Info("Starting collectors...")
@@ -32,7 +31,7 @@ func startCollectors(c config.Config) (collectors []collector.Collector) {
 		}
 		if asInterface, exists := conf["metrics_blacklist"]; exists {
 			for _, element = range config.GetAsSlice(asInterface) {
-				metricsBlacklist[element] = name
+				metricsBlacklist = append(metricsBlacklist, element+"$"+name)
 			}
 		}
 
@@ -117,10 +116,9 @@ func readFromCollector(collector collector.Collector,
 			c = val
 			m.RemoveDimension("collectorCanonicalName")
 		}
-		// check if the metric is blacklisted, if so will continue
-		// processing the next one
-		//log.Error("GIULIA ", metricsBlacklist)
-		if util.StringInSlice(m.Name, c, metricsBlacklist) {
+		// check if the metric is blacklisted, if so skip it and
+		// process the next one
+		if stringInSlice(m.Name, collector.Name(), metricsBlacklist) {
 			continue
 		}
 		emissionCounter[c]++
@@ -165,4 +163,13 @@ func reportCollector(collector collector.Collector) {
 	metric.Value = 1
 	metric.AddDimension("interval", fmt.Sprintf("%d", collector.Interval()))
 	collector.Channel() <- metric
+}
+
+func stringInSlice(metricName string, collectorName string, list []string) bool {
+	for _, v := range list {
+		if metricName+"$"+collectorName == v {
+			return true
+		}
+	}
+	return false
 }
