@@ -169,3 +169,39 @@ func TestCollectorPrefix(t *testing.T) {
 	readFromCollector(collector, []handler.Handler{testHandler})
 	wg.Wait()
 }
+
+func TestCollectorBlacklist(t *testing.T) {
+	logrus.SetLevel(logrus.ErrorLevel)
+
+	c := make(map[string]interface{})
+	c["interval"] = 1
+	c["metrics_blacklist"] = []string{"m[0-9]+$"}
+	col := collector.New("Test")
+	col.SetInterval(1)
+	col.Configure(c)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	collectorStatChannel := make(chan metric.CollectorEmission)
+
+	go func() {
+		defer wg.Done()
+		col.Channel() <- metric.New("m1")
+		time.Sleep(time.Duration(2) * time.Second)
+		col.Channel() <- metric.New("m2")
+		time.Sleep(time.Duration(2) * time.Second)
+		col.Channel() <- metric.New("metric3")
+		close(col.Channel())
+	}()
+	collectorMetrics := map[string]uint64{}
+	go func() {
+		defer wg.Done()
+		for collectorMetric := range collectorStatChannel {
+			collectorMetrics[collectorMetric.Name] = collectorMetric.EmissionCount
+		}
+	}()
+	readFromCollector(col, []handler.Handler{}, collectorStatChannel)
+	wg.Wait()
+
+	assert.Equal(t, uint64(1), collectorMetrics["Test"])
+}

@@ -7,6 +7,7 @@ import (
 	"fullerite/metric"
 
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -21,13 +22,13 @@ func startCollectors(c config.Config) (collectors []collector.Collector) {
 		// will not have that space and needs to have it replaced with an underscore
 		// instead
 		configFile = strings.Replace(configFile, " ", "_", -1)
-		config, err := config.ReadCollectorConfig(configFile)
+		conf, err := config.ReadCollectorConfig(configFile)
 		if err != nil {
 			log.Error("Collector config failed to load for: ", name)
 			continue
 		}
 
-		collectorInst := startCollector(name, c, config)
+		collectorInst := startCollector(name, c, conf)
 		if collectorInst != nil {
 			collectors = append(collectors, collectorInst)
 		}
@@ -108,6 +109,11 @@ func readFromCollector(collector collector.Collector,
 			c = val
 			m.RemoveDimension("collectorCanonicalName")
 		}
+		// check if the metric is blacklisted, if so skip it and
+		// process the next one
+		if stringInSlice(m.Name, collector.Blacklist()) {
+			continue
+		}
 		emissionCounter[c]++
 		// collectorStatChans is an optional parameter. In case of ad-hoc collector
 		// this parameter is not supplied at all. Using variadic arguments is pretty much
@@ -150,4 +156,14 @@ func reportCollector(collector collector.Collector) {
 	metric.Value = 1
 	metric.AddDimension("interval", fmt.Sprintf("%d", collector.Interval()))
 	collector.Channel() <- metric
+}
+
+func stringInSlice(metricName string, list []string) bool {
+	var matched bool
+	for _, v := range list {
+		if matched, _ = regexp.MatchString(v, metricName); matched {
+			return true
+		}
+	}
+	return false
 }
