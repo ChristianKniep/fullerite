@@ -172,10 +172,10 @@ func TestCollectorPrefix(t *testing.T) {
 
 func TestCollectorBlacklist(t *testing.T) {
 	logrus.SetLevel(logrus.ErrorLevel)
-	metricsBlacklist = []string{"m1$Test"}
 
 	c := make(map[string]interface{})
 	c["interval"] = 1
+	c["metrics_go_blacklist"] = []string{"m[0-9]+$"}
 	col := collector.New("Test")
 	col.SetInterval(1)
 	col.Configure(c)
@@ -190,7 +190,7 @@ func TestCollectorBlacklist(t *testing.T) {
 		time.Sleep(time.Duration(2) * time.Second)
 		col.Channel() <- metric.New("m2")
 		time.Sleep(time.Duration(2) * time.Second)
-		col.Channel() <- metric.New("m3")
+		col.Channel() <- metric.New("metric3")
 		close(col.Channel())
 	}()
 	collectorMetrics := map[string]uint64{}
@@ -203,5 +203,5 @@ func TestCollectorBlacklist(t *testing.T) {
 	readFromCollector(col, []handler.Handler{}, collectorStatChannel)
 	wg.Wait()
 
-	assert.Equal(t, uint64(2), collectorMetrics["Test"])
+	assert.Equal(t, uint64(1), collectorMetrics["Test"])
 }
