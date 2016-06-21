@@ -96,7 +96,7 @@ func (col *baseCollector) configureCommonParams(configMap map[string]interface{}
 		}
 	}
 
-	if asInterface, exists := configMap["metrics_go_blacklist"]; exists {
+	if asInterface, exists := configMap["metrics_blacklist"]; exists {
 		col.blacklist = config.GetAsSlice(asInterface)
 	}
 

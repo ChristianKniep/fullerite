@@ -175,7 +175,7 @@ func TestCollectorBlacklist(t *testing.T) {
 
 	c := make(map[string]interface{})
 	c["interval"] = 1
-	c["metrics_go_blacklist"] = []string{"m[0-9]+$"}
+	c["metrics_blacklist"] = []string{"m[0-9]+$"}
 	col := collector.New("Test")
 	col.SetInterval(1)
 	col.Configure(c)
