@@ -32,6 +32,8 @@ type Collector interface {
 	SetCanonicalName(string)
 	Prefix() string
 	SetPrefix(string)
+	Blacklist() []string
+	SetBlacklist([]string)
 }
 
 var collectorConstructs map[string]func(chan metric.Metric, int, *l.Entry) Collector
@@ -77,6 +79,7 @@ type baseCollector struct {
 	collectorType string
 	canonicalName string
 	prefix        string
+	blacklist     []string
 
 	// intentionally exported
 	log *l.Entry
@@ -92,6 +95,11 @@ func (col *baseCollector) configureCommonParams(configMap map[string]interface{}
 			col.prefix = str
 		}
 	}
+
+	if asInterface, exists := configMap["metrics_go_blacklist"]; exists {
+		col.blacklist = config.GetAsSlice(asInterface)
+	}
+
 }
 
 // SetInterval : set the interval to collect on
@@ -112,6 +120,11 @@ func (col *baseCollector) SetCollectorType(collectorType string) {
 // SetCanonicalName : collector canonical name
 func (col *baseCollector) SetCanonicalName(name string) {
 	col.canonicalName = name
+}
+
+// SetBlacklist : set collector optional metrics blacklist
+func (col *baseCollector) SetBlacklist(blacklist []string) {
+	col.blacklist = blacklist
 }
 
 // CanonicalName : collector canonical name
@@ -147,4 +160,9 @@ func (col baseCollector) Interval() int {
 // String returns the collector name in printable format.
 func (col baseCollector) String() string {
 	return col.Name() + "Collector"
+}
+
+// Blacklist returns the list of metrics to be blacklisted for this collector
+func (col *baseCollector) Blacklist() []string {
+	return col.blacklist
 }
