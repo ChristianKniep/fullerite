@@ -7,15 +7,13 @@ import (
 	"fullerite/metric"
 
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
 
-var metricsBlacklist []string
-
 func startCollectors(c config.Config) (collectors []collector.Collector) {
 	log.Info("Starting collectors...")
-	var element string
 
 	for _, name := range c.Collectors {
 		configFile := strings.Join([]string{c.CollectorsConfigPath, name}, "/") + ".conf"
@@ -28,11 +26,6 @@ func startCollectors(c config.Config) (collectors []collector.Collector) {
 		if err != nil {
 			log.Error("Collector config failed to load for: ", name)
 			continue
-		}
-		if asInterface, exists := conf["metrics_blacklist"]; exists {
-			for _, element = range config.GetAsSlice(asInterface) {
-				metricsBlacklist = append(metricsBlacklist, element+"$"+name)
-			}
 		}
 
 		collectorInst := startCollector(name, c, conf)
@@ -118,7 +111,7 @@ func readFromCollector(collector collector.Collector,
 		}
 		// check if the metric is blacklisted, if so skip it and
 		// process the next one
-		if stringInSlice(m.Name, collector.Name(), metricsBlacklist) {
+		if stringInSlice(m.Name, collector.Blacklist()) {
 			continue
 		}
 		emissionCounter[c]++
@@ -165,9 +158,10 @@ func reportCollector(collector collector.Collector) {
 	collector.Channel() <- metric
 }
 
-func stringInSlice(metricName string, collectorName string, list []string) bool {
+func stringInSlice(metricName string, list []string) bool {
+	var matched bool
 	for _, v := range list {
-		if metricName+"$"+collectorName == v {
+		if matched, _ = regexp.MatchString(v, metricName); matched {
 			return true
 		}
 	}
