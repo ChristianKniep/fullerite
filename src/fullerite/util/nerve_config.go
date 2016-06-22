@@ -3,7 +3,6 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"fullerite/config"
 	"net"
 	"regexp"
 	"strconv"
@@ -89,14 +88,26 @@ func ParseNerveConfig(raw *[]byte) (map[int]NerveService, error) {
 }
 
 func extractPort(serviceConfig map[string]interface{}) int {
-	checkConfig := make(map[string]string)
+	checkConfig := make(map[string]interface{})
 
 	if checkArray, ok := serviceConfig["checks"].([]interface{}); ok {
-		checkConfig = config.GetAsMap(checkArray[0])
+		checkConfig = checkArray[0].(map[string]interface{})
 	}
 
-	if uri, ok := checkConfig["uri"]; ok {
-		uriArray := strings.Split(uri, "/")
+	var uri string
+
+	if uriInterface, ok := checkConfig["uri"]; ok {
+		if str, ok := uriInterface.(string); ok {
+			uri = str
+		}
+	}
+
+	if len(uri) == 0 {
+		return -1
+	}
+
+	uriArray := strings.Split(uri, "/")
+	if len(uriArray) > 3 {
 		protocol := strings.TrimSpace(uriArray[1])
 		port := uriArray[3]
 		if !httpRegexp.MatchString(protocol) {
@@ -105,7 +116,6 @@ func extractPort(serviceConfig map[string]interface{}) int {
 		if portInt, err := strconv.ParseInt(port, 10, 64); err == nil {
 			return int(portInt)
 		}
-		return -1
 	}
 	return -1
 }

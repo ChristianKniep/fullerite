@@ -68,6 +68,86 @@ func getTestNerveConfig() []byte {
 	return []byte(raw)
 }
 
+func noURINerveConfig() []byte {
+	return []byte(`
+	{
+	    "services": {
+	        "example_service.main.norcal-devc.superregion:norcal-devc.13752.new": {
+	            "check_interval": 7,
+	            "checks": [
+	                {
+	                    "fall": 2,
+	                    "headers": {},
+	                    "host": "127.0.0.1",
+	                    "type": "http"
+	                }
+	            ],
+	            "host": "10.56.5.21",
+	            "port": 13752,
+	            "weight": 24,
+	            "zk_hosts": [
+	                "10.40.1.17:22181"
+	            ],
+	            "zk_path": "/nerve/superregion:norcal-devc/example_service.main"
+	        }
+             }
+        }`)
+}
+
+func badURINerveConfig() []byte {
+	return []byte(`
+	{
+	    "services": {
+	        "example_service.main.norcal-devc.superregion:norcal-devc.13752.new": {
+	            "check_interval": 7,
+	            "checks": [
+	                {
+	                    "fall": 2,
+	                    "headers": {},
+	                    "host": "127.0.0.1",
+	                    "type": "http",
+	                    "uri": "/http/example_service.main"
+	                }
+	            ],
+	            "host": "10.56.5.21",
+	            "port": 13752,
+	            "weight": 24,
+	            "zk_hosts": [
+	                "10.40.1.17:22181"
+	            ],
+	            "zk_path": "/nerve/superregion:norcal-devc/example_service.main"
+	        }
+             }
+        }`)
+}
+
+func invalidURINerveConfig() []byte {
+	return []byte(`
+	{
+	    "services": {
+	        "example_service.main.norcal-devc.superregion:norcal-devc.13752.new": {
+	            "check_interval": 7,
+	            "checks": [
+	                {
+	                    "fall": 2,
+	                    "headers": {},
+	                    "host": "127.0.0.1",
+	                    "type": "http",
+	                    "uri": 1000
+	                }
+	            ],
+	            "host": "10.56.5.21",
+	            "port": 13752,
+	            "weight": 24,
+	            "zk_hosts": [
+	                "10.40.1.17:22181"
+	            ],
+	            "zk_path": "/nerve/superregion:norcal-devc/example_service.main"
+	        }
+             }
+        }`)
+}
+
 func TestNerveConfigParsing(t *testing.T) {
 	expected := map[int]NerveService{
 		22224: NerveService{Name: "example_service", Namespace: "mesosstage_main"},
@@ -106,5 +186,26 @@ func TestHandlePoorlyFormedJson(t *testing.T) {
 	results, err := ParseNerveConfig(&cfgString)
 	assert.NotNil(t, err)
 	assert.NotNil(t, results)
+	assert.Equal(t, 0, len(results))
+}
+
+func TestNoURI(t *testing.T) {
+	cfgString := noURINerveConfig()
+	ipGetter = func() ([]string, error) { return []string{"10.56.5.21"}, nil }
+	results, _ := ParseNerveConfig(&cfgString)
+	assert.Equal(t, 0, len(results))
+}
+
+func TestBadURI(t *testing.T) {
+	cfgString := badURINerveConfig()
+	ipGetter = func() ([]string, error) { return []string{"10.56.5.21"}, nil }
+	results, _ := ParseNerveConfig(&cfgString)
+	assert.Equal(t, 0, len(results))
+}
+
+func TestInvalidURI(t *testing.T) {
+	cfgString := invalidURINerveConfig()
+	ipGetter = func() ([]string, error) { return []string{"10.56.5.21"}, nil }
+	results, _ := ParseNerveConfig(&cfgString)
 	assert.Equal(t, 0, len(results))
 }
